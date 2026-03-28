@@ -8,25 +8,8 @@
 
 ### F-00: 인증
 
-#### API 엔드포인트
-
-| Method | Path | 설명 |
-|--------|------|------|
-| GET | `/auth/google` | Google OAuth 2.0 인증 시작 (redirect) |
-| GET | `/auth/google/callback` | OAuth 콜백 처리 → JWT 발급 |
-| POST | `/auth/verify-email` | 이메일 Verify Code 발송 요청 |
-| POST | `/auth/verify-email/confirm` | Verify Code 검증 및 2-step 완료 |
-| POST | `/auth/logout` | 로그아웃 (토큰 무효화) |
-
-#### 입력 / 출력 필드
-
-**POST `/auth/verify-email`**
-- 입력: `{ "email": "user@doubleugames.com" }`
-- 출력: `{ "message": "인증 코드가 발송되었습니다.", "expiresIn": 300 }`
-
-**POST `/auth/verify-email/confirm`**
-- 입력: `{ "email": "user@doubleugames.com", "code": "123456" }`
-- 출력: `{ "accessToken": "...", "tokenType": "Bearer" }`
+#### 기능 개요
+Google OAuth 2.0 기반 로그인과 이메일 Verify Code 2-step 인증을 통해 허용된 회사 이메일 소유자만 서비스에 접근할 수 있도록 한다.
 
 #### 비즈니스 규칙
 
@@ -34,7 +17,7 @@
 - Verify Code: 6자리 숫자, 유효 시간 5분
 - 코드 오입력 5회 이상 → 해당 이메일 5분 잠금 (확정)
 - Google OAuth 성공 후 이메일 Verify Code 미완료 상태면 접근 제한 (2-step 미완료 상태 유지)
-- JWT 만료 시간: 1시간 (확정). Refresh Token 미도입 — 만료 시 재로그인 유도
+- 로그인 세션은 1시간 유지. 만료 시 재로그인 필요
 
 #### 권한 구분
 
@@ -49,26 +32,22 @@
 
 ### F-00-B: 회원 프로필 관리
 
-#### API 엔드포인트
-
-| Method | Path | 설명 |
-|--------|------|------|
-| GET | `/members/me` | 내 프로필 조회 |
-| PATCH | `/members/me` | 내 프로필 수정 |
-| GET | `/admin/members` | 전체 회원 목록 조회 (관리자 전용) |
-| PATCH | `/admin/members/{memberId}/role` | 회원 권한 변경 (관리자 전용) |
-
-#### 입력 / 출력 필드
-
-**PATCH `/members/me`**
-- 입력: `{ "nickname": "홍길동", "department": "개발팀", "slackUserId": "U01XXXXXXX" }`
-- 출력: `{ "id": 1, "email": "...", "name": "...", "nickname": "...", "department": "...", "role": "MEMBER" }`
+#### 기능 개요
+회원이 본인 프로필(닉네임, 부서, 슬랙 사용자 ID)을 확인하고 수정한다. 관리자는 전체 회원 목록 조회 및 권한 변경이 가능하다.
 
 #### 비즈니스 규칙
 
-- `name`은 Google 계정 이름 자동 동기화 — 직접 수정 불가
-- `slackUserId`는 DM 알림 발송에 사용. 미등록 시 DM 알림 발송 불가 (채널 공지만 수신)
+- 이름은 Google 계정 이름 자동 동기화 — 직접 수정 불가
+- 슬랙 사용자 ID 미등록 시 개인 DM 알림 발송 불가 (채널 공지만 수신)
 - 관리자는 `ADMIN` / 일반 회원은 `MEMBER` — 역할은 관리자만 변경 가능
+
+#### 권한 구분
+
+| 기능 | 일반 회원 | 관리자 |
+|------|-----------|--------|
+| 본인 프로필 조회/수정 | O | O |
+| 전체 회원 목록 조회 | X | O |
+| 회원 역할 변경 | X | O |
 
 ---
 
@@ -76,39 +55,17 @@
 
 ### F-01: 책 신청 폼
 
-#### API 엔드포인트
-
-| Method | Path | 설명 |
-|--------|------|------|
-| POST | `/clubs/{clubId}/books/parse-url` | 알라딘 URL 파싱 → 도서 정보 반환 |
-| GET | `/clubs/{clubId}/book-requests` | 이번 달 전체 신청 목록 조회 |
-| POST | `/clubs/{clubId}/book-requests` | 책 신청 등록 |
-| PATCH | `/clubs/{clubId}/book-requests/{requestId}` | 책 신청 수정 (잠금 전) |
-| DELETE | `/clubs/{clubId}/book-requests/{requestId}` | 책 신청 취소 |
-| POST | `/admin/clubs/{clubId}/book-requests/lock` | 신청 마감 잠금 처리 (관리자) |
-
-#### 입력 / 출력 필드
-
-**POST `/clubs/{clubId}/books/parse-url`**
-- 입력: `{ "url": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=..." }`
-- 출력: `{ "title": "책 제목", "author": "저자명", "isbn": "9791234567890", "price": 18000, "currency": "KRW" }`
-
-**POST `/clubs/{clubId}/book-requests`**
-- 입력: `{ "title": "...", "author": "...", "isbn": "...", "price": 18000, "category": "LITERATURE", "sourceUrl": "https://..." }`
-- 출력: `{ "id": 42, "status": "PENDING", "remainingBudget": 17000 }`
-
-**GET `/clubs/{clubId}/book-requests`**
-- Query: `?year=2026&month=3`
-- 출력: 신청 목록 배열 + `{ "totalCount": 12, "myRemainingBudget": 17000 }`
+#### 기능 개요
+회원이 알라딘 URL을 입력하면 도서 정보가 자동 파싱된다. 당월 예산 범위 내에서 1권 이상 신청 가능하며, 관리자가 신청 마감 처리를 하기 전까지 수정/취소가 가능하다.
 
 #### 비즈니스 규칙
 
-- URL 파싱 대상: 알라딘(`aladin.co.kr`) 전용 — 타 도메인 입력 시 400 오류 반환
-- ISBN 중복 신청: 동일 월 내 동일 ISBN 재신청 시 409 오류 반환
-- 예산 초과: 신청 시점에 잔여 예산 계산 → 초과분 포함 신청이면 400 오류 + 잔여 예산 안내
-- 잠금(LOCKED) 이후 수정/취소 불가 — 403 오류 반환
+- URL 파싱 대상: 알라딘(`aladin.co.kr`) 전용 — 타 도메인 입력 시 오류 안내
+- 동일 월 내 동일 ISBN 중복 신청 불가
+- 잔여 예산 초과 신청 불가 — 신청 시점에 잔여 예산 실시간 표시
+- 관리자가 신청 마감 처리 후 수정/취소 불가
 - 외서 환율 처리: [결정 필요: 고정 환율 사용 / 신청 시점 환율 API 연동]
-- 카테고리 코드: `LITERATURE`, `HUMANITIES`, `SELF_HELP`, `ART`, `IT`, `COMICS`, `ECONOMY`, `LIFESTYLE`, `SCIENCE`, `ETC`
+- 카테고리: 문학, 인문, 자기계발, 예술, IT, 만화, 경제, 라이프스타일, 과학, 기타
 
 **예산 규칙**
 - 첫 번째 신청월 (신입 첫달): 30,000원 한도
@@ -121,7 +78,7 @@
 | 기능 | 일반 회원 | 관리자 |
 |------|-----------|--------|
 | 전체 신청 목록 조회 | O | O |
-| 본인 신청 등록/수정/취소 | O (잠금 전) | O |
+| 본인 신청 등록/수정/취소 | O (마감 전) | O |
 | 타 회원 신청 수정/삭제 | X | O |
 | 신청 마감 잠금 처리 | X | O |
 
@@ -129,27 +86,15 @@
 
 ### F-02: 주문 자동화
 
-#### API 엔드포인트
-
-| Method | Path | 설명 |
-|--------|------|------|
-| POST | `/admin/clubs/{clubId}/orders/generate` | 신청 취합 → 합산 주문서 생성 |
-| GET | `/admin/clubs/{clubId}/orders/{orderId}` | 주문서 조회 |
-| PATCH | `/admin/clubs/{clubId}/orders/{orderId}/status` | 주문 상태 변경 |
-| GET | `/clubs/{clubId}/orders/my` | 내 주문 상태 조회 |
-
-#### 입력 / 출력 필드
-
-**PATCH `/admin/clubs/{clubId}/orders/{orderId}/status`**
-- 입력: `{ "status": "ORDERED" }` — 상태값: `PENDING` → `ORDERED` → `SHIPPING` → `ARRIVED`
-- 출력: `{ "orderId": 1, "status": "ORDERED", "updatedAt": "2026-03-28T10:00:00" }`
+#### 기능 개요
+신청 마감 후 관리자가 전체 신청 건을 취합하여 합산 주문서를 생성한다. 동일 ISBN 복수 신청은 자동으로 1건 합산된다.
 
 #### 비즈니스 규칙
 
-- 주문서 생성은 신청 마감(LOCKED) 이후에만 가능 — 이전 시도 시 409 오류
+- 주문서 생성은 신청 마감 이후에만 가능
 - 동일 ISBN 복수 신청 → 주문서 생성 시 1건으로 자동 합산
-- 재고 확인 API: [TBD: 알라딘 Open API 스펙 확인 필요 — 폴링 or Webhook]
 - 품절 감지 시 신청자에게 슬랙 DM 발송 + 관리자 채널 공지
+- 재고 확인: [TBD: 알라딘 Open API 스펙 확인 필요]
 
 #### 권한 구분
 
@@ -162,19 +107,8 @@
 
 ### F-03: 인포 수령 관리
 
-#### API 엔드포인트
-
-| Method | Path | 설명 |
-|--------|------|------|
-| POST | `/admin/clubs/{clubId}/orders/{orderId}/arrive` | 도서 도착 처리 + 수령 알림 발송 |
-| POST | `/clubs/{clubId}/orders/{orderId}/receive` | 수령 완료 처리 (본인) |
-| GET | `/admin/clubs/{clubId}/orders/{orderId}/receive-status` | 미수령자 목록 조회 (관리자) |
-
-#### 입력 / 출력 필드
-
-**POST `/clubs/{clubId}/orders/{orderId}/receive`**
-- 입력: 없음 (인증 토큰으로 회원 식별)
-- 출력: `{ "receivedAt": "2026-03-28T14:30:00" }`
+#### 기능 개요
+관리자가 도서 도착을 처리하면 신청자 전원에게 슬랙 DM으로 수령 안내 알림이 발송된다. 회원은 직접 수령 완료 처리를 한다.
 
 #### 비즈니스 규칙
 
@@ -194,31 +128,14 @@
 
 ### F-04: 독후감 제출
 
-#### API 엔드포인트
-
-| Method | Path | 설명 |
-|--------|------|------|
-| GET | `/clubs/{clubId}/book-reports` | 이번 달 독후감 목록 조회 |
-| GET | `/clubs/{clubId}/book-reports/my` | 내 독후감 조회 |
-| POST | `/clubs/{clubId}/book-reports` | 독후감 제출 |
-| PATCH | `/clubs/{clubId}/book-reports/{reportId}` | 독후감 수정 (마감 전) |
-| GET | `/admin/clubs/{clubId}/book-reports/status` | 제출 현황 조회 (관리자) |
-
-#### 입력 / 출력 필드
-
-**POST `/clubs/{clubId}/book-reports`**
-- 입력: `{ "bookRequestId": 42, "title": "독후감 제목", "content": "본문 내용", "rating": 4 }`
-- 출력: `{ "id": 10, "submittedAt": "2026-03-28T15:00:00", "status": "SUBMITTED" }`
-
-**GET `/admin/clubs/{clubId}/book-reports/status`**
-- Query: `?year=2026&month=3`
-- 출력: `{ "totalMembers": 20, "submitted": 15, "notSubmitted": [{ "memberId": 3, "name": "홍길동" }] }`
+#### 기능 개요
+회원이 당월 신청한 도서에 대한 독후감(제목, 본문, 별점)을 작성하고 마감일 전까지 제출한다.
 
 #### 비즈니스 규칙
 
-- 독후감은 당월 책 신청 건에만 연결 가능 — 타 월 bookRequestId 사용 시 400 오류
-- 마감일 이후 수정 불가 — 403 오류 반환
-- 별점(rating): 1~5 정수만 허용
+- 독후감은 당월 신청 도서에만 연결 가능
+- 마감일 이후 수정 불가
+- 별점: 1~5점
 - 본문 최소 글자 수: [결정 필요: 100자 / 200자 / 제한 없음]
 - 마감일 D-7 / D-3 / D-1 자동 리마인더 → 04-notification-spec.md 참조
 
@@ -234,26 +151,14 @@
 
 ### F-05: 촬영 일정 관리
 
-#### API 엔드포인트
-
-| Method | Path | 설명 |
-|--------|------|------|
-| GET | `/clubs/{clubId}/photo-schedules` | 촬영 일정 목록 조회 |
-| POST | `/admin/clubs/{clubId}/photo-schedules` | 촬영 일정 등록 (관리자) |
-| PATCH | `/admin/clubs/{clubId}/photo-schedules/{scheduleId}` | 촬영 일정 수정 (관리자) |
-| DELETE | `/admin/clubs/{clubId}/photo-schedules/{scheduleId}` | 촬영 일정 삭제 (관리자) |
-
-#### 입력 / 출력 필드
-
-**POST `/admin/clubs/{clubId}/photo-schedules`**
-- 입력: `{ "scheduledAt": "2026-04-05T14:00:00", "location": "FLOOR_13", "assignedAdminId": 2 }`
-- 출력: `{ "id": 5, "scheduledAt": "...", "location": "FLOOR_13", "assignedAdmin": { "id": 2, "name": "..." } }`
+#### 기능 개요
+관리자가 월간 단체 사진 촬영 일정을 등록/수정/삭제한다. 일정 변경 시 전체 회원에게 슬랙 공지가 자동 발송된다.
 
 #### 비즈니스 규칙
 
-- 촬영 공간: `FLOOR_13`, `FLOOR_16` — 공간별 담당 관리자 사전 등록 필요
+- 촬영 공간: 13층, 16층 — 공간별 담당 관리자 사전 등록 필요
 - 일정 수정 시 기존 등록자 전원에게 슬랙 알림 자동 발송
-- 동일 날짜 동일 공간 중복 등록 시 409 오류 반환
+- 동일 날짜 동일 공간 중복 등록 불가
 - 촬영 불참 벌점 부여: 관리자가 F-07을 통해 수동 부여
 
 #### 권한 구분
@@ -267,25 +172,13 @@
 
 ### F-06: 일정 관리 (운영 캘린더)
 
-#### API 엔드포인트
-
-| Method | Path | 설명 |
-|--------|------|------|
-| GET | `/clubs/{clubId}/schedules` | 월별 운영 일정 조회 |
-| POST | `/admin/clubs/{clubId}/schedules` | 운영 일정 등록 (관리자) |
-| PATCH | `/admin/clubs/{clubId}/schedules/{scheduleId}` | 운영 일정 수정 (관리자) |
-| DELETE | `/admin/clubs/{clubId}/schedules/{scheduleId}` | 운영 일정 삭제 (관리자) |
-
-#### 입력 / 출력 필드
-
-**POST `/admin/clubs/{clubId}/schedules`**
-- 입력: `{ "type": "BOOK_REQUEST_DEADLINE", "date": "2026-04-10", "description": "4월 책 신청 마감" }`
-- 출력: `{ "id": 7, "type": "BOOK_REQUEST_DEADLINE", "date": "2026-04-10" }`
+#### 기능 개요
+관리자가 월별 운영 일정(책 신청 마감, 독후감 마감, 촬영, 월례 미팅)을 등록하면 해당 일정 기반으로 알림 스케줄이 자동 생성된다.
 
 #### 비즈니스 규칙
 
-- 일정 타입: `BOOK_REQUEST_DEADLINE`, `BOOK_REPORT_DEADLINE`, `PHOTO_SHOOT`, `MONTHLY_MEETING`
-- 동일 월 동일 타입 일정이 없으면 알림 발송 시 경고 처리 (누락 방지)
+- 일정 종류: 책 신청 마감, 독후감 마감, 촬영, 월례 미팅
+- 해당 월 일정이 미등록 상태면 알림 발송 시 경고 처리 (누락 방지)
 - 독후감 마감일 등록 시 D-7/D-3/D-1 알림 스케줄 자동 생성
 
 #### 권한 구분
@@ -299,32 +192,15 @@
 
 ### F-07: 벌점 관리
 
-#### API 엔드포인트
-
-| Method | Path | 설명 |
-|--------|------|------|
-| GET | `/clubs/{clubId}/penalties/my` | 내 벌점 이력 조회 |
-| GET | `/admin/clubs/{clubId}/penalties` | 전체 벌점 이력 조회 (관리자) |
-| POST | `/admin/clubs/{clubId}/penalties` | 벌점 수동 부여 (관리자) |
-| DELETE | `/admin/clubs/{clubId}/penalties/{penaltyId}` | 벌점 취소 (관리자) |
-| POST | `/clubs/{clubId}/penalties/{penaltyId}/dispute` | 이의 제기 (회원) |
-| PATCH | `/admin/clubs/{clubId}/penalties/{penaltyId}/dispute` | 이의 제기 처리 (관리자) |
-
-#### 입력 / 출력 필드
-
-**POST `/admin/clubs/{clubId}/penalties`**
-- 입력: `{ "memberId": 3, "type": "BOOK_REPORT_MISSING", "reason": "3월 독후감 미제출", "targetMonth": "2026-03" }`
-- 출력: `{ "id": 15, "memberId": 3, "type": "BOOK_REPORT_MISSING", "score": -1, "createdAt": "..." }`
-
-**POST `/clubs/{clubId}/penalties/{penaltyId}/dispute`**
-- 입력: `{ "reason": "제출했으나 시스템 오류로 누락된 것으로 추정됩니다." }`
-- 출력: `{ "disputeId": 3, "status": "PENDING" }`
+#### 기능 개요
+관리자가 미제출·불참·미수령 등 사유별로 벌점을 수동 부여한다. 회원은 벌점 이력을 조회하고 이의를 제기할 수 있다.
 
 #### 비즈니스 규칙
 
-- 벌점 타입별 점수: `BOOK_REPORT_MISSING` (-1), `PHOTO_ABSENT` (-1), `BOOK_NOT_RECEIVED` (-1) [결정 필요: 점수 가중치 차등 적용 여부]
-- 동일 회원 동일 월 동일 타입 벌점 중복 부여 불가 — 409 오류 반환
-- 이의 제기 상태: `PENDING` → `ACCEPTED`(벌점 취소) / `REJECTED`(벌점 유지)
+- 벌점 부여 항목: 독후감 미제출, 촬영 불참, 도서 미수령 (각 -1점)
+- [결정 필요: 항목별 점수 가중치 차등 적용 여부]
+- 동일 회원 동일 월 동일 항목 중복 부여 불가
+- 이의 제기: 처리 중 → 수락(벌점 취소) / 기각(벌점 유지)
 - 이의 제기 처리 시 해당 회원에게 슬랙 DM 발송
 
 #### 권한 구분
@@ -341,28 +217,14 @@
 
 ### F-08: 도서 대여 관리
 
-#### API 엔드포인트
-
-| Method | Path | 설명 |
-|--------|------|------|
-| GET | `/clubs/{clubId}/library` | 책장 도서 목록 조회 |
-| POST | `/admin/clubs/{clubId}/library` | 도서 등록 (관리자) |
-| POST | `/clubs/{clubId}/library/{bookId}/borrow` | 대여 신청 |
-| POST | `/clubs/{clubId}/library/{bookId}/return` | 반납 처리 |
-| GET | `/clubs/{clubId}/library/my-borrows` | 내 대여 이력 |
-| GET | `/admin/clubs/{clubId}/library/overdue` | 장기 미반납 목록 (관리자) |
-
-#### 입력 / 출력 필드
-
-**POST `/clubs/{clubId}/library/{bookId}/borrow`**
-- 입력: `{ "expectedReturnDate": "2026-04-28" }`
-- 출력: `{ "borrowId": 8, "borrowedAt": "...", "expectedReturnDate": "..." }`
+#### 기능 개요
+동호회 책장에 등록된 도서를 정식 회원이 대여/반납할 수 있다. 반납 기한 초과 시 자동 알림이 발송된다.
 
 #### 비즈니스 규칙
 
-- 대여 자격: 동호회 정식 회원만 가능 — 비회원 403 오류
+- 대여 자격: 동호회 정식 회원만 가능
 - 동일 도서 동시 대여 불가 — 반납 완료 후 재대여 가능
-- 반납 기한 초과 14일 → 자동 알림 발송 [결정 필요: 알림 기준일 7일 / 14일 / 30일]
+- 반납 기한 초과 시 자동 알림 발송 [결정 필요: 알림 기준일 7일 / 14일 / 30일]
 - 장기 미반납 기준: [TBD: 운영 규정 확정 필요]
 
 #### 권한 구분
@@ -391,13 +253,8 @@
 
 ### F-11: 포인트 / 벌점 시스템
 
-#### API 엔드포인트
-
-| Method | Path | 설명 |
-|--------|------|------|
-| GET | `/clubs/{clubId}/points/my` | 내 포인트 이력 조회 |
-| GET | `/clubs/{clubId}/points/ranking` | 월간 랭킹 조회 |
-| POST | `/admin/clubs/{clubId}/points` | 포인트 수동 부여 (관리자) |
+#### 기능 개요
+회원의 활동 기여도를 포인트로 수치화한다. 월간 랭킹을 통해 참여 동기를 부여한다.
 
 #### 비즈니스 규칙
 
@@ -426,5 +283,5 @@
 | 항목 | 내용 |
 |------|------|
 | Google OAuth 연동 복잡도 | 회사 이메일 도메인 한정 설정 필요 (Workspace 관리자 협조) |
-| 외부 API 의존성 | 알라딘/교보 재고 API 스펙 전 별도 폴링 또는 캐시 로직 필요 |
-| 무제 전용 vs 범용 설계 일관성 | Phase 2 무제 전용 기능이 보편 모듈로 추상화될 수 있도록 도메인 모델 설계 시 고려 필요 |
+| 외부 API 의존성 | 알라딘/교보 재고 API 스펙 확인 전 별도 처리 로직 필요 |
+| 무제 전용 vs 범용 설계 일관성 | Phase 2 무제 전용 기능이 보편 모듈로 추상화될 수 있도록 설계 시 고려 필요 |
