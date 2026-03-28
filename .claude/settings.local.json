@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(update-config)",
+      "mcp__notion__API-post-search",
+      "mcp__notion__API-get-block-children",
+      "mcp__claude_ai_Slack__slack_read_channel",
+      "WebFetch(domain:docs.google.com)",
+      "WebFetch(domain:doc-0s-4k-sheets.googleusercontent.com)"
+    ]
+  }
+}
