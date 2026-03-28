@@ -1,0 +1,46 @@
+# 모듈 확장 전략
+
+---
+
+## 1. 두 번째 동호회 추가 시 작업 범위
+
+새로운 동호회(예: 사진 동호회 "픽셀")를 추가할 때 수정/추가가 필요한 파일은 아래로 한정된다. 공통 코어 레이어는 수정하지 않는다.
+
+**추가 대상 (신규 파일)**
+
+```
+com.example.demo.club.pixel/       # 새 동호회 전용 모듈 패키지
+├── domain/                        # 픽셀 전용 엔티티
+├── repository/
+├── service/
+├── dto/
+└── controller/
+```
+
+**수정 대상 (최소 변경)**
+
+- `Club.type` Enum에 신규 동호회 타입 추가 (예: `PHOTO`)
+- Spring Security 권한 설정에서 신규 경로 패턴 추가
+
+**수정 불필요**
+
+- `user`, `auth`, `notification`, `common` 패키지 전체
+- 기존 `club.untitled` 패키지 전체
+
+---
+
+## 2. 공통 인터페이스 설계 방향 (Phase 4 준비)
+
+Phase 4 모듈 템플릿화를 대비하여 무제 전용 모듈은 `ClubPlugin` 인터페이스를 염두에 두고 설계한다. 현재 단계에서는 인터페이스를 강제 구현하지 않으나, 서비스 클래스가 해당 계약을 자연스럽게 따르도록 메서드 시그니처를 설계한다.
+
+```java
+// Phase 4 도입 예정 — 현재는 참조용 계획만 기재
+interface ClubPlugin {
+    String getClubType();                              // 동호회 유형 식별자
+    List<ScheduleType> getSupportedScheduleTypes();    // 지원하는 일정 타입 목록
+    List<PenaltyType> getSupportedPenaltyTypes();      // 지원하는 벌점 타입 목록
+    // ...
+}
+```
+
+각 동호회 전용 모듈의 메인 서비스가 이 인터페이스를 구현하는 형태로, Phase 4에서 Spring의 `@ConditionalOnProperty` 또는 모듈 활성화 설정으로 플러그인을 선택적으로 등록하는 구조를 목표로 한다.
