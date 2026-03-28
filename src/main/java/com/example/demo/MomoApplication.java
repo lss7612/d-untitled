@@ -2,12 +2,14 @@ package com.example.demo;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 
 @SpringBootApplication
-public class UntitledApplication {
+@EnableJpaAuditing
+public class MomoApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(UntitledApplication.class, args);
+		SpringApplication.run(MomoApplication.class, args);
 	}
 
 }
