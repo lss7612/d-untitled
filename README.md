@@ -1,6 +1,10 @@
 # 🏢 사내 동호회 통합 관리 플랫폼 (Internal Club Management System)
 
-더블유게임즈(Wemade) & 더블다운인터액티브(DoubleDown Interactive) 임직원의 즐거운 커뮤니티 활동을 지원하고, 운영진의 반복 업무를 자동화하는 **AI-Native** 통합 관리 솔루션입니다.
+더블유게임즈(DoubleU Games) & 더블다운인터액티브(DoubleDown Interactive) 사내 동호회의 운영 효율을 높이고 즐거운 커뮤니티 활동을 지원하는 통합 관리 솔루션입니다.
+
+## 📎 기획 문서 (Planning Docs)
+
+- /docs/plan 폴더 참조.
 
 ---
 
@@ -23,10 +27,10 @@
 - **E2E Testing**: **Playwright** (사용자 시나리오 자동 테스트)
 
 ### ⚙️ Backend
-- **Language**: Java 17+
-- **Framework**: **Spring Boot**
+- **Language**: Java 21
+- **Framework**: **Spring Boot 4.0.4**
 - **Auth**: Spring Security, **Google OAuth 2.0** (사내 계정 인증)
-- **Database**: JPA / Hibernate (MySQL/PostgreSQL 등)
+- **Database**: **Spring Data JPA** / Hibernate — MySQL (production)
 
 ### 🤖 AI & Operations (Experimental)
 - **Model Context Protocol (MCP)**: Claude 기반 운영 자동화 레이어 (DB 핸들링 및 API 연동)
@@ -39,7 +43,7 @@
 ### 1. 일반 회원 (General User)
 - **인증**: 사내 구글 계정 로그인 및 이메일 Verification Code 인증.
 - **대시보드**: 가입 동호회 목록 및 월별 정기 과업(독후감, 사진 업로드 등) 확인.
-- **알림**: 카카오톡 또는 슬랙(Slack) 중 선호하는 채널로 리마인더 수신.
+- **알림**: 슬랙(Slack) Incoming Webhook으로 리마인더 수신.
 - **보상**: 미션 수행 시 활동 포인트 적립.
 
 ### 2. 관리자 (Admin)
@@ -53,13 +57,13 @@
 
 1. **Core Module**: 인증, 알림, 포인트 등 전 동호회 공통 기능.
 2. **Club Module**: 각 동호회별 독립적 로직 (최초 프로토타입: **독서 동호회 '무제'**).
-3. **External API**: Google Auth, Slack Webhook, Kakao Alimtalk 연동.
+3. **External API**: Google Auth, Slack Webhook 연동.
 
 ---
 
 ## 🚀 로드맵 (Roadmap)
 
 1. **Step 1**: 구글 계정 기반 인증 체계 및 기본 회원 관리 구축
-2. **Step 3**: '무제(독서 동호회)' 전용 기능 및 알림 자동화 구현
-3. **Step 4**: 포인트/벌점 시스템 및 MCP 기반 AI 관리 레이어 구축
-4. **Step 5**: 타 동호회 확장을 위한 모듈 템플릿화
+2. **Step 2**: '무제(독서 동호회)' 전용 기능 및 알림 자동화 구현
+3. **Step 3**: 포인트/벌점 시스템 및 슬랙 채널 연동
+4. **Step 4**: 타 동호회 확장을 위한 모듈 템플릿화
