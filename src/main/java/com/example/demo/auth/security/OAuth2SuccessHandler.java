@@ -55,7 +55,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             Member member = memberService.upsert(email, name, picture);
             log.info("[OAuth2SuccessHandler] member upserted, id={}", member.getId());
 
-            String token = jwtTokenProvider.generateToken(member.getId());
+            String token = jwtTokenProvider.generateToken(member.getId(), member.isEmailVerified());
             log.info("[OAuth2SuccessHandler] token generated, redirecting to frontend");
 
             String redirectUrl = frontendUrl + "/auth/callback?token=" + token;

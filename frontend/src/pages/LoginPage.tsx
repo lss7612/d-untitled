@@ -1,8 +1,11 @@
+import { useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, useReducedMotion } from 'motion/react'
 import { Bell, Users, Trophy } from 'lucide-react'
 import { ShimmerButton } from '@/components/ui/shimmer-button'
 import { AnimatedGridPattern } from '@/components/ui/animated-grid-pattern'
 import { cn } from '@/lib/utils'
+import { isEmailVerified } from '@/lib/jwt'
 
 const FEATURES = [
   { icon: Bell, label: '스마트\n알림' },
@@ -10,8 +13,27 @@ const FEATURES = [
   { icon: Trophy, label: '포인트\n시스템' },
 ]
 
+const ERROR_MESSAGES: Record<string, string> = {
+  domain_not_allowed: '등록된 회사 이메일만 이용 가능합니다.',
+  auth_failed: 'Google 인증에 실패했습니다. 다시 시도해주세요.',
+  server_error: '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+}
+
 export default function LoginPage() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const shouldReduceMotion = useReducedMotion()
+
+  const errorParam = searchParams.get('error')
+  const errorMessage = errorParam ? (ERROR_MESSAGES[errorParam] ?? '알 수 없는 오류가 발생했습니다.') : null
+
+  // 이미 인증 완료된 사용자는 /home으로 리다이렉트
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken')
+    if (token && isEmailVerified(token)) {
+      navigate('/home', { replace: true })
+    }
+  }, [navigate])
 
   function handleGoogleLogin() {
     window.location.href = 'http://localhost:8080/oauth2/authorization/google'
@@ -87,6 +109,12 @@ export default function LoginPage() {
             <p className="text-sm font-medium text-zinc-200">로그인</p>
             <p className="text-xs text-zinc-500 mt-1">회사 Google 계정으로 시작하세요</p>
           </div>
+
+          {errorMessage && (
+            <p role="alert" className="w-full rounded-lg bg-red-950/40 border border-red-800/40 px-3 py-2 text-xs text-red-400 text-center">
+              {errorMessage}
+            </p>
+          )}
 
           <ShimmerButton
             onClick={handleGoogleLogin}
