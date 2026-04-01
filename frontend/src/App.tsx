@@ -3,6 +3,7 @@ import { ThemeProvider } from 'next-themes'
 import { Toaster } from '@/components/ui/sonner'
 import LoginPage from '@/pages/LoginPage'
 import AuthCallbackPage from '@/pages/AuthCallbackPage'
+import EmailVerifyPage from '@/pages/EmailVerifyPage'
 import AllClubsPage from '@/pages/AllClubsPage'
 import ClubsPage from '@/pages/ClubsPage'
 import MujePage from '@/pages/MujePage'
@@ -16,6 +17,7 @@ function App() {
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
+          <Route path="/auth/email-verify" element={<EmailVerifyPage />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/home" element={<AllClubsPage />} />
             <Route path="/clubs" element={<ClubsPage />} />

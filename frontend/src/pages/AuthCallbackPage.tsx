@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { isEmailVerified } from '@/lib/jwt'
 
 export default function AuthCallbackPage() {
   const navigate = useNavigate()
@@ -16,7 +17,11 @@ export default function AuthCallbackPage() {
 
     if (token) {
       localStorage.setItem('accessToken', token)
-      navigate('/home', { replace: true })
+      if (isEmailVerified(token)) {
+        navigate('/home', { replace: true })
+      } else {
+        navigate('/auth/email-verify', { replace: true })
+      }
     } else {
       navigate('/login?error=missing_token')
     }
