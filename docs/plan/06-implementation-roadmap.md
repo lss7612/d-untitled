@@ -85,19 +85,27 @@
 
 > 구현 착수 전 반드시 결정해야 할 항목을 우선순위 순으로 정렬한다.
 
-### [P0] Phase 1 착수 전 — 즉시 결정 필요
+### [P0] Phase 1 착수 전 — 결정 완료
 
-| 번호 | 항목 | 선택지 | 관련 기능 |
-|------|------|--------|-----------|
-| 1 | JWT 만료 시간 및 Refresh Token 도입 여부 | 1시간 / 24시간 / 7일 + Refresh Token | F-00 인증 |
-| 2 | 이메일 오입력 잠금 시간 | 5분 / 10분 / 30분 | F-00 인증, PAGE-01-B |
-| 3 | Slack ID 미등록 회원 DM 실패 시 관리자 알림 여부 | 알림 발송 / 로그만 기록 | F-10 채널 연동, NT 전체 |
+| 번호 | 항목 | 결정 | 관련 기능 |
+|------|------|------|-----------|
+| 1 | JWT 만료 시간 및 Refresh Token 도입 여부 | **Sliding 1시간** (API 호출 시 갱신, 비활동 1시간이면 만료, Refresh Token 미도입) | F-00 인증 |
+| 2 | 이메일 오입력 잠금 시간 | **5분** | F-00 인증, PAGE-01-B |
+| 3 | Slack ID 미등록 회원 DM 실패 시 관리자 알림 여부 | **로그만 기록** (채널 @멘션으로 대체) | F-10 채널 연동, NT 전체 |
+
+### [P0] 인프라 결정
+
+| 번호 | 항목 | 결정 |
+|------|------|------|
+| I-1 | 이메일 발송 SMTP | **Gmail SMTP (회사 Workspace 계정 + 앱 비밀번호)**. `application.properties`에 `spring.mail.*` 설정. ~45명 규모에서 일일 한도(500) 충분. Phase 3에서 SES/Workspace SMTP API 전환 검토 |
+| I-2 | 프론트 프레임워크 | **Vite + React 18 + TypeScript + React Router v6**. Next.js 미사용 |
+| I-3 | 최초 ADMIN 임명 | DB 시드 (마이그레이션 또는 직접 SQL). 별도 UI 없음 |
 
 ### [P1] Phase 2 착수 전 — 기능 설계에 직접 영향
 
-| 번호 | 항목 | 선택지 | 관련 기능 |
-|------|------|--------|-----------|
-| 4 | 외서 환율 처리 방식 | 고정 환율 테이블 / 신청 시점 환율 API 연동 | F-01 책 신청 |
+| 번호 | 항목 | 결정 / 선택지 | 관련 기능 |
+|------|------|---------------|-----------|
+| 4 | 외서 환율 처리 방식 | **신청 시점 환율 1개 임시 적용 (확정)** — `BookRequest.exchangeRate`에 동결 | F-01 책 신청 |
 | 5 | 인포 수령 확인 방식 | 버튼 클릭 유지 / QR 스캔 도입 | F-03 인포 수령, PAGE-04 |
 | 6 | 독후감 본문 최소 글자 수 | 100자 / 200자 / 제한 없음 | F-04 독후감, PAGE-05 |
 | 7 | 벌점 점수 가중치 차등 적용 여부 | 항목 무관 모두 -1점 / 항목별 차등 | F-07 벌점, 도메인 모델 |
@@ -126,30 +134,42 @@
 
 ### 패키지 구조 원칙
 
-최상위 도메인은 `club`이다. 하위에 동호회별 모듈을 배치한다. `user`는 동호회 간 공유 도메인이므로 `club` 외부에 독립적으로 위치한다.
+> 정답은 [docs/backend/02-package-structure.md](../backend/02-package-structure.md)에 있다. 본 섹션은 그 요약본이다.
+
+`common`, `auth`, `user`, `club`, `notification`을 top-level로 분리한다. `auth`와 `notification`은 횡단 관심사이므로 도메인 패키지(`user`, `club`)와 독립적으로 위치한다. 무제 전용 모듈은 `club.untitled` 하위에 격리한다.
 
 ```
 com.example.demo
-├── user                    # 공유 도메인 — Member 엔티티 / 인증
-│   ├── domain
-│   └── api
-├── club                    # 최상위 동호회 도메인
-│   ├── core                # 공통 Core: Club, ClubMember, Schedule, Penalty, Point, Notification
-│   │   ├── domain
-│   │   └── api
-│   └── untitled            # 무제 전용 모듈: BookRequest, BookReport, PhotoSchedule, LibraryBook, BookLending
-│       ├── domain
-│       └── api
+├── common/                 # 전역 공통 (config, exception, response, util)
+├── auth/                   # 인증 — Google OAuth + 이메일 2-step + JWT
+├── user/                   # 회원 공통 도메인 — Member 엔티티
+├── club/                   # 동호회 공통 코어 + 무제 전용 모듈
+│   ├── domain/             # 공통: Club, ClubMember, Schedule, Penalty, PenaltyDispute, Point
+│   ├── repository/
+│   ├── service/
+│   ├── dto/
+│   ├── controller/
+│   └── untitled/           # 무제 전용 모듈
+│       ├── domain/         # BookRequest, BookReport, PhotoSchedule, LibraryBook, BookLending
+│       ├── repository/
+│       ├── service/
+│       ├── dto/
+│       ├── controller/
+│       └── external/       # AladinApiClient 등
+└── notification/           # 알림 인프라 — Notification 엔티티 + Slack 발송 + 스케줄러
 ```
+
+각 도메인은 `domain / repository / service / dto / controller` 5단 레이어로 구성한다.
 
 ### 도메인 ↔ 기능 스펙 연결
 
 | 패키지 위치 | 소속 도메인 | 커버하는 기능 | 기획 Phase |
 |-------------|------------|---------------|------------|
 | `user` | Member | F-00, F-00-B (인증, 프로필) | Phase 1 |
-| `club.core` | Club, ClubMember, Schedule | F-06 (운영 일정), PAGE-02 (동호회 목록) | Phase 1~2 |
-| `club.core` | Penalty, PenaltyDispute, Point | F-07 (벌점), F-11 (포인트) | Phase 2~3 |
-| `club.core` | Notification | NT-01~NT-09 알림 전체 | Phase 3 |
+| `auth` | (도메인 없음, 인증 처리) | F-00 OAuth + 이메일 2-step | Phase 1 |
+| `club.domain` | Club, ClubMember, Schedule | F-06 (운영 일정), PAGE-02 (동호회 목록) | Phase 1~2 |
+| `club.domain` | Penalty, PenaltyDispute, Point | F-07 (벌점), F-11 (포인트) | Phase 2~3 |
+| `notification` | Notification | NT-01~NT-09 알림 전체 | Phase 3 |
 | `club.untitled` | BookRequest | F-01 (책 신청), F-02 (주문) | Phase 2 |
 | `club.untitled` | BookReport | F-04 (독후감) | Phase 2 |
 | `club.untitled` | PhotoSchedule | F-05 (촬영 일정) | Phase 2 |
@@ -158,7 +178,8 @@ com.example.demo
 ### Phase 4 모듈화 방향
 
 - Phase 2 구현 시점부터 `club.untitled` 내 비즈니스 로직을 `ClubPlugin` 인터페이스로 추상화할 수 있도록 의존성 방향을 단방향으로 유지한다.
-- `club.core`는 `club.untitled`를 직접 참조하지 않는다. `untitled`가 `core`를 참조하는 방향만 허용한다.
+- `club.domain` 공통 레이어는 `club.untitled`를 직접 참조하지 않는다. `untitled`가 `club.domain`을 참조하는 방향만 허용한다.
+- `Schedule`/`Penalty`의 타입은 Core enum 대신 **String typeCode**로 저장하고, 각 `ClubPlugin`이 자신이 지원하는 typeCode set을 SPI로 선언한다. 신규 동호회 추가 시 Core enum 수정이 발생하지 않도록 한다.
 - Phase 4에서 `club.untitled`를 `ReadingClubPlugin`으로 분리하고, 신규 동호회는 `BaseClubPlugin`을 구현해 독립 모듈로 추가하는 방식으로 확장한다.
 
 ---
@@ -169,7 +190,7 @@ com.example.demo
 
 | 역할 | 채택 기술 |
 |------|-----------|
-| UI 프레임워크 | React (Vite 기반) |
+| UI 프레임워크 | **Vite + React 18+ (TypeScript)** — Next.js 미사용 (확정) |
 | 컴포넌트 | shadcn/ui |
 | 애니메이션/고급 UI | Magic UI |
 | 서버 상태 관리 | TanStack Query (React Query v5) |

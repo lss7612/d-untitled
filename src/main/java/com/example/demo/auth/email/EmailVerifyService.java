@@ -1,6 +1,7 @@
 package com.example.demo.auth.email;
 
 import com.example.demo.auth.security.JwtTokenProvider;
+import com.example.demo.club.service.ClubMembershipService;
 import com.example.demo.common.exception.BusinessException;
 import com.example.demo.user.domain.Member;
 import com.example.demo.user.repository.MemberRepository;
@@ -22,6 +23,7 @@ public class EmailVerifyService {
     private final JavaMailSender mailSender;
     private final MemberRepository memberRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final ClubMembershipService clubMembershipService;
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -32,6 +34,8 @@ public class EmailVerifyService {
 
         String code = generateCode();
         verifyCodeStore.save(email, code);
+
+        log.info("[EmailVerify] ===== DEV CODE ===== email={} code={} =====", email, code);
 
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(email);
@@ -65,6 +69,8 @@ public class EmailVerifyService {
         Member member = memberRepository.findByEmail(email)
                 .orElseThrow(() -> new BusinessException("회원 정보를 찾을 수 없습니다.", 404));
         member.verifyEmail();
+
+        clubMembershipService.autoEnrollDefaultClub(member.getId());
 
         return jwtTokenProvider.generateToken(member.getId(), true);
     }

@@ -3,6 +3,11 @@
 > 작성일: 2026-03-28
 > 대상 프로젝트: untitled (사내 동호회 관리 플랫폼 — 무제 독서 동호회)
 > 참고 페이지: PAGE-01 ~ PAGE-08
+>
+> ⚠️ **프레임워크 최종 결정**: 본 문서의 "Next.js 15 권장" 내용은 stale이다.
+> 최종 결정은 **Vite + React 18 + TypeScript + React Router v6**이며, 실제 코드도 이 구조로 구현되어 있다.
+> 정답은 [docs/plan/06-implementation-roadmap.md](../plan/06-implementation-roadmap.md) [P0] 인프라 결정 표(I-2)를 따른다.
+> Magic UI 컴포넌트 조사 내용 자체는 유효하므로 참고용으로 유지한다.
 
 ---
 

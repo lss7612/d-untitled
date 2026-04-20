@@ -10,7 +10,8 @@
       "mcp__magicuidesign-mcp__listRegistryItems",
       "mcp__magicuidesign-mcp__getRegistryItem",
       "WebFetch(domain:ui-ux-pro-max-skill.nextlevelbuilder.io)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "mcp__Claude_Preview__preview_start"
     ]
   },
   "enabledMcpjsonServers": [
