@@ -7,6 +7,7 @@ import EmailVerifyPage from '@/pages/EmailVerifyPage'
 import AllClubsPage from '@/pages/AllClubsPage'
 import ClubsPage from '@/pages/ClubsPage'
 import MujePage from '@/pages/MujePage'
+import BookRequestPage from '@/pages/BookRequestPage'
 import ProtectedRoute from '@/components/ProtectedRoute'
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
             <Route path="/home" element={<AllClubsPage />} />
             <Route path="/clubs" element={<ClubsPage />} />
             <Route path="/muje" element={<MujePage />} />
+            <Route path="/muje/book-requests" element={<BookRequestPage />} />
           </Route>
         </Routes>
         <Toaster />
