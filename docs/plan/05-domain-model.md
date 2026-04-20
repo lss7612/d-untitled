@@ -8,21 +8,21 @@
 ## 도메인 경계 원칙
 
 ```
-[Core Domain]          [무제 전용 Domain]
-─────────────          ─────────────────
-Member                 BookRequest
+[Core Domain]          [무제 전용 Domain]      [인프라 / 횡단 관심사]
+─────────────          ─────────────────      ────────────────────
+Member                 BookRequest             Notification (알림 발송 이력)
 Club                   BookReport
 ClubMember             PhotoSchedule
-Notification           BookLending
-NotificationLog        LibraryBook
-Penalty
+Schedule               BookLending
+Penalty                LibraryBook
 PenaltyDispute
 Point
-Schedule
 ```
 
 - **Core Domain**: 모든 동호회에 공통 적용되는 도메인
 - **무제 전용 Domain**: 독서 동호회 특화 기능. Phase 4에서 모듈로 추상화 예정
+- **인프라 / 횡단 관심사**: 특정 동호회 도메인이 아닌 횡단 관심사. `com.example.demo.notification` 패키지에 격리하며, Slack 발송 / 스케줄러 / 발송 이력을 담당
+- **SPI 방향**: Phase 4부터 `ClubPlugin` 인터페이스로 동호회별 `ScheduleType` / `PenaltyType` typeCode를 등록한다. Core Enum에 동호회 전용 타입을 박지 않는다
 
 ---
 
@@ -65,9 +65,9 @@ Schedule
 | `memberId` | Long | FK → Member |
 | `role` | Enum | `ADMIN`, `MEMBER` |
 | `joinedAt` | LocalDateTime | 가입 일시 |
-| `firstRequestMonth` | YearMonth | 첫 책 신청 월 (예산 한도 전환 기준) |
 
 - `role`은 동호회 단위로 부여. 동일 회원이 A 동호회 ADMIN / B 동호회 MEMBER 가능
+- 예산 한도 전환 기준은 `Member.createdAt`의 YearMonth로 계산한다. 별도 필드를 두지 않는다 (가입월 = 30,000원 한도, 그 다음 월부터 35,000원).
 
 ---
 
@@ -77,7 +77,7 @@ Schedule
 |------|------|------|
 | `id` | Long | PK |
 | `clubId` | Long | FK → Club |
-| `type` | Enum | `BOOK_REQUEST_DEADLINE`, `BOOK_REPORT_DEADLINE`, `PHOTO_SHOOT`, `MONTHLY_MEETING` |
+| `typeCode` | String | 일정 타입 코드 (예: `"BOOK_REQUEST_DEADLINE"`, `"BOOK_REPORT_DEADLINE"`). 각 `ClubPlugin`이 자신이 지원하는 typeCode set을 SPI로 등록한다. Core enum에 동호회 전용 타입을 박지 않는다 |
 | `date` | LocalDate | 일정 날짜 |
 | `description` | String | 일정 설명 (nullable) |
 | `yearMonth` | YearMonth | 귀속 월 (리마인더 스케줄링 기준) |
@@ -91,7 +91,7 @@ Schedule
 | `id` | Long | PK |
 | `clubId` | Long | FK → Club |
 | `memberId` | Long | FK → Member |
-| `type` | Enum | `BOOK_REPORT_MISSING`, `PHOTO_ABSENT`, `BOOK_NOT_RECEIVED` |
+| `typeCode` | String | 벌점 타입 코드 (예: `"BOOK_REPORT_MISSING"`, `"PHOTO_ABSENT"`, `"BOOK_NOT_RECEIVED"`). 각 `ClubPlugin`이 SPI로 등록 |
 | `score` | Int | 벌점 점수 (음수값. 기본 -1) |
 | `reason` | String | 부여 사유 |
 | `targetMonth` | YearMonth | 귀속 월 |
@@ -132,6 +132,10 @@ Schedule
 
 ---
 
+## 인프라 / 횡단 관심사 엔티티
+
+> 특정 동호회 도메인이 아닌 횡단 관심사. `com.example.demo.notification` 패키지에 격리한다.
+
 ### Notification (알림 발송 이력)
 
 | 필드 | 타입 | 설명 |
@@ -160,8 +164,10 @@ Schedule
 | `title` | String | 도서명 |
 | `author` | String | 저자 |
 | `isbn` | String | ISBN-13 |
-| `price` | Int | 도서 가격 (원화 기준) |
-| `currency` | String | 통화 코드 (기본 `KRW`) |
+| `price` | Int | 도서 가격 (원화 환산 기준 — 외서는 `originalPrice` × `exchangeRate`로 계산하여 저장) |
+| `originalPrice` | Decimal | 원래 통화 기준 가격 (외서일 때만 의미. 국내서는 `price`와 동일) |
+| `currency` | String | 통화 코드 (기본 `KRW`. 외서: `USD` / `JPY` 등) |
+| `exchangeRate` | Decimal | 신청 시점 환율(`originalPrice → KRW`). 신청 시점에 동결한다. 국내서는 1.0 |
 | `category` | Enum | 카테고리 코드 |
 | `sourceUrl` | String | 알라딘 상품 URL |
 | `status` | Enum | `PENDING`, `LOCKED`, `ORDERED`, `SHIPPING`, `ARRIVED`, `RECEIVED` |
@@ -249,8 +255,9 @@ Club ──< PhotoSchedule
 
 | 구분 | 엔티티 | Phase 4 추상화 방향 |
 |------|--------|---------------------|
-| Core | Member, Club, ClubMember, Schedule, Penalty, PenaltyDispute, Point, Notification | 모든 동호회 공통 사용 |
+| Core | Member, Club, ClubMember, Schedule, Penalty, PenaltyDispute, Point | 모든 동호회 공통 사용. `Schedule`/`Penalty`의 `typeCode`는 각 `ClubPlugin`이 SPI로 등록 |
 | 무제 전용 | BookRequest, BookReport, PhotoSchedule, LibraryBook, BookLending | `ClubPlugin` 인터페이스로 추상화 예정 |
+| 인프라 | Notification | 동호회와 무관한 횡단 관심사. `com.example.demo.notification` 패키지에 격리 |
 
 - Phase 4에서 무제 전용 도메인을 `ReadingClubPlugin` 모듈로 분리
 - 신규 동호회는 `BaseClubPlugin`을 구현하고 필요한 엔티티만 활성화하는 방식으로 확장

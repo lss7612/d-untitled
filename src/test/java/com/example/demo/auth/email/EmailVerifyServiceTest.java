@@ -1,6 +1,7 @@
 package com.example.demo.auth.email;
 
 import com.example.demo.auth.security.JwtTokenProvider;
+import com.example.demo.club.service.ClubMembershipService;
 import com.example.demo.common.exception.BusinessException;
 import com.example.demo.user.domain.Member;
 import com.example.demo.user.repository.MemberRepository;
@@ -32,13 +33,16 @@ class EmailVerifyServiceTest {
     @Mock
     private JwtTokenProvider jwtTokenProvider;
 
+    @Mock
+    private ClubMembershipService clubMembershipService;
+
     private VerifyCodeStore verifyCodeStore;
     private EmailVerifyService emailVerifyService;
 
     @BeforeEach
     void setUp() {
         verifyCodeStore = new VerifyCodeStore();
-        emailVerifyService = new EmailVerifyService(verifyCodeStore, mailSender, memberRepository, jwtTokenProvider);
+        emailVerifyService = new EmailVerifyService(verifyCodeStore, mailSender, memberRepository, jwtTokenProvider, clubMembershipService);
     }
 
     // === sendCode 테스트 ===

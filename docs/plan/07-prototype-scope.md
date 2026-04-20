@@ -322,15 +322,15 @@
 
 ```
 [STEP 1] 프로젝트 초기 세팅
-  - Next.js 15 프로젝트 생성 (TypeScript, App Router, Tailwind CSS)
+  - Vite + React 18 + TypeScript + React Router v6 + Tailwind CSS 프로젝트 생성 (확정)
   - shadcn/ui 초기화 + 필수 컴포넌트 설치
     (Button, Input, Form, Dialog, Tabs, Card, Table, Badge, Toast/Sonner,
      Select, Textarea, InputOTP, Alert, DropdownMenu)
   - Magic UI 설치: ShimmerButton, AnimatedGridPattern, MagicCard, NumberTicker, BentoGrid
   - Framer Motion, TanStack Query, Zustand, Axios, react-hook-form + zod 설치
-  - API 클라이언트 설정: lib/api/client.ts (axios 인스턴스 + JWT 인터셉터)
+  - API 클라이언트 설정: src/api/client.ts (axios 인스턴스 + JWT 인터셉터)
   - QueryProvider 설정
-  - Route Guard 미들웨어 설정 (인증 상태 확인, /admin 역할 확인)
+  - 라우터 가드 컴포넌트 (`ProtectedRoute`)로 인증 상태 확인, /admin 경로는 ADMIN 역할 확인 추가
   - MSW 설치 + 기본 Mock 핸들러 구성 (백엔드 의존 없이 선행 구현용)
 
 [STEP 2] 인증 플로우 (PAGE-01, PAGE-01-B)
@@ -338,6 +338,7 @@
   - /auth/callback: 토큰 파싱 + emailVerified 분기 처리
   - PAGE-01-B: InputOTP 6자리 + 60초 타이머 + 오입력 횟수 카운트
   - 토큰 저장 (localStorage, MVP) + axios 인터셉터 주입
+  - JWT는 Sliding 1시간 만료. axios 인터셉터에서 401 응답 감지 시 토큰 제거 + /login 리다이렉트
 
 [STEP 3] 동호회 목록 (PAGE-02)
   - 동호회 카드(MagicCard) + 무제 진입

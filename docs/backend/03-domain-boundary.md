@@ -31,7 +31,7 @@
 
 `ClubMember`는 `club` 도메인 소속(`com.example.demo.club.domain.ClubMember`)이다.
 
-- **역할**: 특정 회원이 특정 동호회에 속하는 관계를 표현하며, 동호회 단위 역할(`ADMIN` / `MEMBER`)과 첫 책 신청월(`firstRequestMonth`, 예산 한도 전환 기준)을 보유한다.
+- **역할**: 특정 회원이 특정 동호회에 속하는 관계를 표현하며, 동호회 단위 역할(`ADMIN` / `MEMBER`)을 보유한다. 예산 한도 전환 기준은 별도 필드 없이 `Member.createdAt`의 YearMonth로 계산한다 (가입월 30,000원, 그 다음 월부터 35,000원).
 - **참조 방향**: `ClubMember → Club` (@ManyToOne), `ClubMember → Member` (@ManyToOne, `memberId` FK 기반 또는 직접 참조)
 - 동일 회원이 복수 동호회에 가입 가능하므로 `(clubId, memberId)` 복합 유니크 제약을 설정한다.
 
