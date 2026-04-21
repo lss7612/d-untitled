@@ -6,6 +6,7 @@ import {
   deleteBookRequest,
   lockBookRequests,
   unlockBookRequests,
+  markReceived,
   type BookCategory,
 } from '@/api/bookRequests'
 
@@ -60,6 +61,14 @@ export function useUnlockBookRequests(clubId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (yearMonth?: string) => unlockBookRequests(clubId, yearMonth),
+    onSuccess: () => invalidateBookRequestsAll(qc, clubId),
+  })
+}
+
+export function useMarkReceived(clubId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (ids: number[]) => markReceived(clubId, ids),
     onSuccess: () => invalidateBookRequestsAll(qc, clubId),
   })
 }

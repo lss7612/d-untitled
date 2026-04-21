@@ -47,6 +47,8 @@ export interface BookRequestResponse {
   statusLabel: string
   targetMonth: string
   createdAt: string
+  arrivedAt: string | null
+  receivedAt: string | null
 }
 
 export interface MyBookRequestsResponse {
@@ -96,3 +98,13 @@ export const unlockBookRequests = (clubId: number, yearMonth?: string) => {
     method: 'POST',
   })
 }
+
+export interface MarkReceivedResult {
+  affected: number
+}
+
+export const markReceived = (clubId: number, ids: number[]) =>
+  apiFetch<MarkReceivedResult>(`/api/v1/clubs/${clubId}/book-requests/mark-received`, {
+    method: 'PATCH',
+    body: JSON.stringify({ ids }),
+  })

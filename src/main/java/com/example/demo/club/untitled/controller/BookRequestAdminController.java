@@ -1,5 +1,6 @@
 package com.example.demo.club.untitled.controller;
 
+import com.example.demo.club.untitled.dto.MarkRequest;
 import com.example.demo.club.untitled.service.BookRequestService;
 import com.example.demo.common.response.ApiResponse;
 import com.example.demo.user.domain.Member;
@@ -38,9 +39,30 @@ public class BookRequestAdminController {
         return ApiResponse.ok(new LockResult(ym.toString(), count));
     }
 
+    @PatchMapping("/mark-arrived")
+    public ApiResponse<MarkResult> markArrived(
+        @PathVariable Long clubId,
+        @RequestBody MarkRequest req,
+        @AuthenticationPrincipal Member member
+    ) {
+        int count = bookRequestService.markArrived(clubId, member.getId(), req.ids());
+        return ApiResponse.ok(new MarkResult(count));
+    }
+
+    @PatchMapping("/mark-unarrived")
+    public ApiResponse<MarkResult> markUnarrived(
+        @PathVariable Long clubId,
+        @RequestBody MarkRequest req,
+        @AuthenticationPrincipal Member member
+    ) {
+        int count = bookRequestService.markUnarrived(clubId, member.getId(), req.ids());
+        return ApiResponse.ok(new MarkResult(count));
+    }
+
     private YearMonth parse(String yearMonth) {
         return (yearMonth == null || yearMonth.isBlank()) ? YearMonth.now() : YearMonth.parse(yearMonth);
     }
 
     public record LockResult(String yearMonth, int affected) {}
+    public record MarkResult(int affected) {}
 }

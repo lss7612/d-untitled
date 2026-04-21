@@ -97,6 +97,14 @@ public class BookRequest {
     @LastModifiedDate
     private LocalDateTime updatedAt;
 
+    /** 도착 처리 시각 (ARRIVED 진입 시 세팅, ARRIVED→ORDERED 되돌리면 null). */
+    @Column(name = "arrived_at")
+    private LocalDateTime arrivedAt;
+
+    /** 수령 처리 시각 (RECEIVED 진입 시 세팅). */
+    @Column(name = "received_at")
+    private LocalDateTime receivedAt;
+
     public static BookRequest create(
         Long clubId, Long memberId,
         String title, String author, String publisher, String isbn,
@@ -132,6 +140,21 @@ public class BookRequest {
     public void revertToLocked() {
         this.orderId = null;
         this.status = BookRequestStatus.LOCKED;
+    }
+
+    public void markArrived() {
+        this.status = BookRequestStatus.ARRIVED;
+        this.arrivedAt = LocalDateTime.now();
+    }
+
+    public void markUnarrived() {
+        this.status = BookRequestStatus.ORDERED;
+        this.arrivedAt = null;
+    }
+
+    public void markReceived() {
+        this.status = BookRequestStatus.RECEIVED;
+        this.receivedAt = LocalDateTime.now();
     }
 
     public void edit(BookCategory category) {
