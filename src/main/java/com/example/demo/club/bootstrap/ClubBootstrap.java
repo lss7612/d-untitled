@@ -43,7 +43,7 @@ public class ClubBootstrap implements CommandLineRunner {
 
         memberRepository.findAll().stream()
             .filter(Member::isEmailVerified)
-            .forEach(m -> membershipService.autoEnrollDefaultClub(m.getId()));
+            .forEach(membershipService::autoEnroll);
     }
 
     private void seedSchedulesIfMissing(Long clubId) {
