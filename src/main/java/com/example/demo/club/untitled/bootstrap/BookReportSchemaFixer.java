@@ -73,5 +73,13 @@ public class BookReportSchemaFixer implements CommandLineRunner {
                 log.warn("[BookReportSchemaFixer] rating drop 실패: {}", e.getMessage());
             }
         }
+
+        // 3) book_request_id NOT NULL → NULL 허용 (구 UNIQUE 제약 잔재)
+        try {
+            em.createNativeQuery("ALTER TABLE book_reports ALTER COLUMN book_request_id SET NULL").executeUpdate();
+            log.info("[BookReportSchemaFixer] book_request_id NULL 허용 완료");
+        } catch (Exception e) {
+            log.warn("[BookReportSchemaFixer] book_request_id NULL alter 실패 (이미 nullable일 수 있음): {}", e.getMessage());
+        }
     }
 }

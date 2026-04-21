@@ -10,6 +10,7 @@ import com.example.demo.user.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +19,7 @@ import java.time.YearMonth;
 
 @Slf4j
 @Component
+@Order(2)
 @RequiredArgsConstructor
 public class ClubBootstrap implements CommandLineRunner {
 
