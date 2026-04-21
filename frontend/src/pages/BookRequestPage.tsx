@@ -9,6 +9,7 @@ import {
   useCreateBookRequest,
   useDeleteBookRequest,
 } from '@/hooks/useBookRequests'
+import { useMyClubs } from '@/hooks/useClubs'
 import { BOOK_CATEGORIES, type BookCategory, type ParsedBookResponse } from '@/api/bookRequests'
 
 const MUJE_CLUB_ID = 1
@@ -20,9 +21,12 @@ export default function BookRequestPage() {
   const [parsed, setParsed] = useState<ParsedBookResponse | null>(null)
 
   const { data: my, isLoading } = useMyBookRequests(MUJE_CLUB_ID)
+  const { data: myClubs } = useMyClubs()
   const parseMut = useParseBookUrl(MUJE_CLUB_ID)
   const createMut = useCreateBookRequest(MUJE_CLUB_ID)
   const deleteMut = useDeleteBookRequest(MUJE_CLUB_ID)
+
+  const isAdmin = myClubs?.some((c) => c.id === MUJE_CLUB_ID && c.myRole === 'ADMIN') ?? false
 
   function handleParse() {
     if (!url.trim()) return
@@ -95,9 +99,27 @@ export default function BookRequestPage() {
             </div>
           )}
           {locked && (
-            <p className="mt-3 text-xs text-amber-400">⚠ 이번 달 신청이 마감되었습니다.</p>
+            <div className="mt-4 -mx-4 -mb-4 px-4 py-2 rounded-b-xl bg-amber-950/40 border-t border-amber-900/50">
+              <p className="text-xs text-amber-300">🔒 이번 달 신청이 마감되었습니다. 새 신청 / 수정 / 취소가 불가합니다.</p>
+            </div>
           )}
         </div>
+
+        {/* 관리자 안내 */}
+        {isAdmin && (
+          <div className="mb-6 rounded-xl border border-amber-900/40 bg-amber-950/20 p-4 flex items-center justify-between">
+            <p className="text-sm text-amber-300">
+              관리자는 전체 신청 / 잠금 / 합산 주문서 / 카트 담기를{' '}
+              <button
+                onClick={() => navigate('/muje/admin/book-requests')}
+                className="underline text-amber-200 hover:text-amber-100"
+              >
+                관리자 화면
+              </button>
+              에서 처리하세요.
+            </p>
+          </div>
+        )}
 
         {/* URL 입력 */}
         <div className="mb-6 rounded-xl border border-zinc-800/40 bg-zinc-900/50 p-5">
@@ -196,7 +218,7 @@ export default function BookRequestPage() {
                     {br.author} · {br.categoryLabel}
                   </p>
                   <p className="text-xs text-zinc-400 mt-1">
-                    {br.price.toLocaleString()}원 · {br.status}
+                    {br.price.toLocaleString()}원 · {br.statusLabel}
                   </p>
                 </div>
                 {br.status === 'PENDING' && (

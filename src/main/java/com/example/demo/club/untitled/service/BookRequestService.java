@@ -56,8 +56,15 @@ public class BookRequestService {
 
         int limit = budgetCalculator.limitFor(member, targetMonth);
         int used = budgetCalculator.sumUsed(mine);
-        boolean locked = bookRequestRepository.existsByClubIdAndTargetMonthAndStatus(
-            clubId, targetMonth.toString(), BookRequestStatus.LOCKED);
+        // "이번 달 신청 마감 잠금됨" = 비-PENDING 책이 하나라도 있음 (LOCKED 또는 ORDERED 등).
+        // 모든 LOCKED → ORDERED로 처리해도 잠금 상태로 인식됨.
+        boolean locked = bookRequestRepository.existsByClubIdAndTargetMonthAndStatusIn(
+            clubId, targetMonth.toString(),
+            java.util.List.of(
+                BookRequestStatus.LOCKED, BookRequestStatus.ORDERED,
+                BookRequestStatus.SHIPPING, BookRequestStatus.ARRIVED, BookRequestStatus.RECEIVED
+            )
+        );
 
         return new MyBookRequestsResponse(
             targetMonth.toString(),
@@ -81,9 +88,13 @@ public class BookRequestService {
 
         YearMonth targetMonth = YearMonth.now();
 
-        // 잠금 상태 체크
-        if (bookRequestRepository.existsByClubIdAndTargetMonthAndStatus(
-                clubId, targetMonth.toString(), BookRequestStatus.LOCKED)) {
+        // 잠금 상태 체크 (비-PENDING 책이 하나라도 있으면 마감 진행 중)
+        if (bookRequestRepository.existsByClubIdAndTargetMonthAndStatusIn(
+                clubId, targetMonth.toString(),
+                java.util.List.of(
+                    BookRequestStatus.LOCKED, BookRequestStatus.ORDERED,
+                    BookRequestStatus.SHIPPING, BookRequestStatus.ARRIVED, BookRequestStatus.RECEIVED
+                ))) {
             throw new BusinessException("이번 달 신청이 마감되었습니다.", 400);
         }
 
@@ -108,7 +119,7 @@ public class BookRequestService {
             clubId, memberId,
             parsed.title(), parsed.author(), parsed.publisher(), parsed.isbn(),
             priceKrw, parsed.price(), parsed.currency(), rate,
-            req.category(), parsed.sourceUrl(), parsed.thumbnailUrl(),
+            req.category(), parsed.sourceUrl(), parsed.thumbnailUrl(), parsed.aladinItemCode(),
             targetMonth
         );
         return BookRequestResponse.from(bookRequestRepository.save(entity));
@@ -148,5 +159,23 @@ public class BookRequestService {
 
     public List<BookCategory> categories() {
         return List.of(BookCategory.values());
+    }
+
+    @Transactional
+    public int lock(Long clubId, Long memberId, YearMonth targetMonth) {
+        clubService.requireAdmin(clubId, memberId);
+        List<BookRequest> pending = bookRequestRepository
+            .findAllByClubIdAndTargetMonthAndStatus(clubId, targetMonth.toString(), BookRequestStatus.PENDING);
+        pending.forEach(br -> br.changeStatus(BookRequestStatus.LOCKED));
+        return pending.size();
+    }
+
+    @Transactional
+    public int unlock(Long clubId, Long memberId, YearMonth targetMonth) {
+        clubService.requireAdmin(clubId, memberId);
+        List<BookRequest> locked = bookRequestRepository
+            .findAllByClubIdAndTargetMonthAndStatus(clubId, targetMonth.toString(), BookRequestStatus.LOCKED);
+        locked.forEach(br -> br.changeStatus(BookRequestStatus.PENDING));
+        return locked.size();
     }
 }

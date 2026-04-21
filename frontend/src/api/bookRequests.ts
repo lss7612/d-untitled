@@ -44,6 +44,7 @@ export interface BookRequestResponse {
   sourceUrl: string
   thumbnailUrl: string | null
   status: string
+  statusLabel: string
   targetMonth: string
   createdAt: string
 }
@@ -76,3 +77,22 @@ export const createBookRequest = (clubId: number, url: string, category: BookCat
 
 export const deleteBookRequest = (clubId: number, id: number) =>
   apiFetch<null>(`/api/v1/clubs/${clubId}/book-requests/${id}`, { method: 'DELETE' })
+
+export interface LockResult {
+  yearMonth: string
+  affected: number
+}
+
+export const lockBookRequests = (clubId: number, yearMonth?: string) => {
+  const qs = yearMonth ? `?yearMonth=${yearMonth}` : ''
+  return apiFetch<LockResult>(`/api/v1/admin/clubs/${clubId}/book-requests/lock${qs}`, {
+    method: 'POST',
+  })
+}
+
+export const unlockBookRequests = (clubId: number, yearMonth?: string) => {
+  const qs = yearMonth ? `?yearMonth=${yearMonth}` : ''
+  return apiFetch<LockResult>(`/api/v1/admin/clubs/${clubId}/book-requests/unlock${qs}`, {
+    method: 'POST',
+  })
+}

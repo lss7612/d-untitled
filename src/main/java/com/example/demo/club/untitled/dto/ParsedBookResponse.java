@@ -14,7 +14,8 @@ public record ParsedBookResponse(
     BigDecimal exchangeRate,
     Integer priceKrw,
     String thumbnailUrl,
-    String sourceUrl
+    String sourceUrl,
+    String aladinItemCode
 ) {
     public static ParsedBookResponse of(ParsedBook book, BigDecimal exchangeRate, int priceKrw) {
         return new ParsedBookResponse(
@@ -27,7 +28,8 @@ public record ParsedBookResponse(
             exchangeRate,
             priceKrw,
             book.thumbnailUrl(),
-            book.sourceUrl()
+            book.sourceUrl(),
+            book.aladinItemCode()
         );
     }
 }
