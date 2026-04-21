@@ -29,6 +29,9 @@ public class AladinApiClient {
         "<script type=\"application/ld\\+json\">(.*?)</script>", Pattern.DOTALL);
     private static final Pattern ISBN_META_PATTERN = Pattern.compile(
         "<meta property=\"books:isbn\" content=\"([0-9Xx]+)\"\\s*/>");
+    /** 알라딘 내부 도서 코드(K-CODE). 장바구니 URL `wbasket.aspx?AddBook=K...`에서 추출. */
+    private static final Pattern ALADIN_ITEM_CODE_PATTERN = Pattern.compile(
+        "wbasket\\.aspx\\?AddBook=(K[0-9]+)");
     private static final Pattern ALLOWED_HOST = Pattern.compile("^https?://(www\\.)?aladin\\.co\\.kr/.+");
 
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -69,11 +72,14 @@ public class AladinApiClient {
         Matcher isbnMatcher = ISBN_META_PATTERN.matcher(html);
         String isbn = isbnMatcher.find() ? isbnMatcher.group(1) : null;
 
+        Matcher codeMatcher = ALADIN_ITEM_CODE_PATTERN.matcher(html);
+        String aladinItemCode = codeMatcher.find() ? codeMatcher.group(1) : null;
+
         if (title == null || isbn == null || price == null) {
             throw new BusinessException("도서 필수 정보(제목/ISBN/가격)를 찾을 수 없습니다.", 422);
         }
 
-        return new ParsedBook(title, author, publisher, isbn, price, currency, thumbnailUrl, url);
+        return new ParsedBook(title, author, publisher, isbn, price, currency, thumbnailUrl, url, aladinItemCode);
     }
 
     private String fetch(String url) {

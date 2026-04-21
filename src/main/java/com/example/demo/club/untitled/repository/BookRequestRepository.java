@@ -18,4 +18,8 @@ public interface BookRequestRepository extends JpaRepository<BookRequest, Long> 
         Long memberId, Long clubId, String targetMonth, String isbn);
 
     boolean existsByClubIdAndTargetMonthAndStatus(Long clubId, String targetMonth, BookRequestStatus status);
+
+    boolean existsByClubIdAndTargetMonthAndStatusIn(Long clubId, String targetMonth, java.util.Collection<BookRequestStatus> statuses);
+
+    List<BookRequest> findAllByClubIdAndTargetMonthAndStatus(Long clubId, String targetMonth, BookRequestStatus status);
 }

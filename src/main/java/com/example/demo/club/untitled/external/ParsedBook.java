@@ -10,5 +10,6 @@ public record ParsedBook(
     BigDecimal price,
     String currency,
     String thumbnailUrl,
-    String sourceUrl
+    String sourceUrl,
+    String aladinItemCode
 ) {}

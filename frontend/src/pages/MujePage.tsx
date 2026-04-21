@@ -3,14 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import AppHeader from '@/components/AppHeader'
 import { DotPattern } from '@/components/ui/dot-pattern'
 import { useMe } from '@/hooks/useMe'
-import { useClubSchedules } from '@/hooks/useClubs'
+import { useClubSchedules, useMyClubs } from '@/hooks/useClubs'
 import { currentYearMonth, formatKoreanDate, dDay, scheduleLabel } from '@/lib/date'
 
 const MUJE_CLUB_ID = 1
 
 const MENU_ITEMS = [
   { emoji: '📚', label: '책 신청', path: '/muje/book-requests' },
-  { emoji: '✍️', label: '독후감 제출', path: null },
+  { emoji: '✍️', label: '독후감 제출', path: '/muje/book-reports' },
   { emoji: '👤', label: '내 정보', path: null },
 ]
 
@@ -21,6 +21,8 @@ export default function MujePage() {
     MUJE_CLUB_ID,
     currentYearMonth()
   )
+  const { data: myClubs } = useMyClubs()
+  const isAdmin = myClubs?.some((c) => c.id === MUJE_CLUB_ID && c.myRole === 'ADMIN') ?? false
 
   function handleMenu(path: string | null) {
     if (path) navigate(path)
@@ -81,6 +83,34 @@ export default function MujePage() {
               ))}
             </div>
           </section>
+
+          {isAdmin && (
+            <section className="mt-6">
+              <h3 className="text-sm font-medium text-amber-400 uppercase tracking-wider mb-3">관리자</h3>
+              <div className="grid grid-cols-1 gap-3">
+                <button
+                  onClick={() => navigate('/muje/admin/book-requests')}
+                  className="rounded-xl border border-amber-900/40 bg-amber-950/20 p-5 flex items-center gap-3 hover:bg-amber-950/30 transition-colors cursor-pointer text-left"
+                >
+                  <span className="text-2xl">⚙️</span>
+                  <div>
+                    <p className="text-sm text-zinc-200">책 신청 관리</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">전체 신청 / 잠금 / 합산 주문서 / 알라딘 카트</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => navigate('/muje/admin/book-reports')}
+                  className="rounded-xl border border-amber-900/40 bg-amber-950/20 p-5 flex items-center gap-3 hover:bg-amber-950/30 transition-colors cursor-pointer text-left"
+                >
+                  <span className="text-2xl">📋</span>
+                  <div>
+                    <p className="text-sm text-zinc-200">독후감 미제출자</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">월별 작성률 / 미제출자 명단</p>
+                  </div>
+                </button>
+              </div>
+            </section>
+          )}
         </main>
       </div>
     </div>

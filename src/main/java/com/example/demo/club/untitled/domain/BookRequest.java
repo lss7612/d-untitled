@@ -75,6 +75,14 @@ public class BookRequest {
     @Column(name = "thumbnail_url", length = 500)
     private String thumbnailUrl;
 
+    /** 알라딘 내부 도서 코드(K-CODE). 장바구니 URL 생성에 사용. nullable (알라딘이 코드 노출 안 한 도서). */
+    @Column(name = "aladin_item_code", length = 20)
+    private String aladinItemCode;
+
+    /** 합산 주문서 ID. 신청이 주문서에 묶이면 세팅. nullable. */
+    @Column(name = "order_id")
+    private Long orderId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private BookRequestStatus status;
@@ -93,7 +101,7 @@ public class BookRequest {
         Long clubId, Long memberId,
         String title, String author, String publisher, String isbn,
         Integer price, BigDecimal originalPrice, String currency, BigDecimal exchangeRate,
-        BookCategory category, String sourceUrl, String thumbnailUrl,
+        BookCategory category, String sourceUrl, String thumbnailUrl, String aladinItemCode,
         YearMonth targetMonth
     ) {
         BookRequest br = new BookRequest();
@@ -110,9 +118,20 @@ public class BookRequest {
         br.category = category;
         br.sourceUrl = sourceUrl;
         br.thumbnailUrl = thumbnailUrl;
+        br.aladinItemCode = aladinItemCode;
         br.status = BookRequestStatus.PENDING;
         br.targetMonth = targetMonth.toString();
         return br;
+    }
+
+    public void assignToOrder(Long orderId) {
+        this.orderId = orderId;
+        this.status = BookRequestStatus.ORDERED;
+    }
+
+    public void revertToLocked() {
+        this.orderId = null;
+        this.status = BookRequestStatus.LOCKED;
     }
 
     public void edit(BookCategory category) {
