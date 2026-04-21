@@ -18,8 +18,9 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class AppConfigService {
 
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     private final AppConfigRepository appConfigRepository;
-    private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     public AppConfig getConfig(ConfigType type) {
@@ -31,7 +32,7 @@ public class AppConfigService {
         AppConfig config = appConfigRepository.findByType(ConfigType.WHITE_LIST).orElse(null);
         if (config == null) return Set.of();
         try {
-            List<String> emails = objectMapper.readValue(config.getContents(), new TypeReference<>() {});
+            List<String> emails = MAPPER.readValue(config.getContents(), new TypeReference<>() {});
             return Set.copyOf(emails.stream().map(String::toLowerCase).toList());
         } catch (Exception e) {
             log.warn("[AppConfig] WHITE_LIST JSON 파싱 실패: {}", e.getMessage());
