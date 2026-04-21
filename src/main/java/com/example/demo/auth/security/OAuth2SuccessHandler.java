@@ -1,5 +1,6 @@
 package com.example.demo.auth.security;
 
+import com.example.demo.common.appconfig.service.AppConfigService;
 import com.example.demo.user.domain.Member;
 import com.example.demo.user.service.MemberService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,6 +26,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
     private final MemberService memberService;
     private final JwtTokenProvider jwtTokenProvider;
+    private final AppConfigService appConfigService;
 
     @Value("${frontend.url}")
     private String frontendUrl;
@@ -46,8 +48,10 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             log.info("[OAuth2SuccessHandler] email={}", email);
 
             String domain = email.substring(email.indexOf('@') + 1);
-            if (!ALLOWED_DOMAINS.contains(domain)) {
-                log.warn("[OAuth2SuccessHandler] domain not allowed: {}", domain);
+            boolean domainAllowed = ALLOWED_DOMAINS.contains(domain);
+            boolean emailWhitelisted = appConfigService.getWhitelistedEmails().contains(email.toLowerCase());
+            if (!domainAllowed && !emailWhitelisted) {
+                log.warn("[OAuth2SuccessHandler] domain not allowed and not whitelisted: {}", email);
                 response.sendRedirect(frontendUrl + "/login?error=domain_not_allowed");
                 return;
             }

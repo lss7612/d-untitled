@@ -7,6 +7,7 @@ import com.example.demo.club.dto.ClubResponse;
 import com.example.demo.club.repository.ClubMemberRepository;
 import com.example.demo.club.repository.ClubRepository;
 import com.example.demo.common.exception.BusinessException;
+import com.example.demo.user.domain.Member;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,5 +55,10 @@ public class ClubService {
             throw new BusinessException("관리자 권한이 필요합니다.", 403);
         }
         return cm;
+    }
+
+    public ClubMember requireAdmin(Long clubId, Long memberId, Member caller) {
+        if (caller.getRole() == Member.Role.DEVELOPER) return null;
+        return requireAdmin(clubId, memberId);
     }
 }

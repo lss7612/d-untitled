@@ -84,6 +84,24 @@ export default function MujePage() {
             </div>
           </section>
 
+          {me?.role === 'DEVELOPER' && (
+            <section className="mt-6">
+              <h3 className="text-sm font-medium text-purple-400 uppercase tracking-wider mb-3">개발자</h3>
+              <div className="grid grid-cols-1 gap-3">
+                <button
+                  onClick={() => navigate('/developer/whitelist')}
+                  className="rounded-xl border border-purple-900/40 bg-purple-950/20 p-5 flex items-center gap-3 hover:bg-purple-950/30 transition-colors cursor-pointer text-left"
+                >
+                  <span className="text-2xl">🔐</span>
+                  <div>
+                    <p className="text-sm text-zinc-200">화이트리스트 관리</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">도메인 외 허용 이메일 추가/삭제</p>
+                  </div>
+                </button>
+              </div>
+            </section>
+          )}
+
           {isAdmin && (
             <section className="mt-6">
               <h3 className="text-sm font-medium text-amber-400 uppercase tracking-wider mb-3">관리자</h3>

@@ -42,9 +42,12 @@ public class EmailVerifyService {
         message.setSubject("[무제] 이메일 인증 코드");
         message.setText("인증 코드: " + code + "\n\n이 코드는 5분간 유효합니다.");
 
-        log.info("[EmailVerify] 인증 코드 발송 시도 email={}", email);
-        mailSender.send(message);
-        log.info("[EmailVerify] 인증 코드 발송 완료 email={}", email);
+        try {
+            mailSender.send(message);
+            log.info("[EmailVerify] 인증 코드 발송 완료 email={}", email);
+        } catch (Exception e) {
+            log.warn("[EmailVerify] 메일 발송 실패 (위 DEV CODE 사용) email={} reason={}", email, e.getMessage());
+        }
     }
 
     @Transactional

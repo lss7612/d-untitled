@@ -12,6 +12,7 @@ import BookReportPage from '@/pages/BookReportPage'
 import AdminBookRequestsPage from '@/pages/AdminBookRequestsPage'
 import AdminBookReportsPage from '@/pages/AdminBookReportsPage'
 import AdminArrivalsPage from '@/pages/AdminArrivalsPage'
+import DeveloperWhitelistPage from '@/pages/DeveloperWhitelistPage'
 import ProtectedRoute from '@/components/ProtectedRoute'
 
 function App() {
@@ -32,6 +33,7 @@ function App() {
             <Route path="/muje/admin/book-requests" element={<AdminBookRequestsPage />} />
             <Route path="/muje/admin/book-reports" element={<AdminBookReportsPage />} />
             <Route path="/muje/admin/arrivals" element={<AdminArrivalsPage />} />
+            <Route path="/developer/whitelist" element={<DeveloperWhitelistPage />} />
           </Route>
         </Routes>
         <Toaster />

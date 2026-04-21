@@ -29,6 +29,9 @@ public class ClubMembershipService {
     @Value("${app.admin-emails:}")
     private String adminEmailsRaw;
 
+    @Value("${app.developer-emails:sslee@kr.doubledown.com}")
+    private String developerEmailsRaw;
+
     private Set<String> adminEmails() {
         if (adminEmailsRaw == null || adminEmailsRaw.isBlank()) return Set.of();
         return Arrays.stream(adminEmailsRaw.split(","))
@@ -37,12 +40,28 @@ public class ClubMembershipService {
             .collect(Collectors.toSet());
     }
 
+    private Set<String> developerEmails() {
+        if (developerEmailsRaw == null || developerEmailsRaw.isBlank()) return Set.of();
+        return Arrays.stream(developerEmailsRaw.split(","))
+            .map(String::trim).filter(s -> !s.isBlank())
+            .map(String::toLowerCase)
+            .collect(Collectors.toSet());
+    }
+
     public boolean isConfiguredAdmin(Member member) {
-        return adminEmails().contains(member.getEmail().toLowerCase());
+        String email = member.getEmail().toLowerCase();
+        return adminEmails().contains(email) || developerEmails().contains(email);
     }
 
     @Transactional
     public void autoEnroll(Member member) {
+        String emailLower = member.getEmail().toLowerCase();
+        if (developerEmails().contains(emailLower)) {
+            member.assignRole(Member.Role.DEVELOPER);
+        } else if (adminEmails().contains(emailLower) && member.getRole() == Member.Role.MEMBER) {
+            member.assignRole(Member.Role.ADMIN);
+        }
+
         Club defaultClub = clubRepository.findByName(DEFAULT_CLUB_NAME).orElse(null);
         if (defaultClub == null) {
             log.warn("[ClubMembership] 기본 동호회({})가 존재하지 않습니다. 자동 가입 건너뜁니다.", DEFAULT_CLUB_NAME);
