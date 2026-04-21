@@ -17,6 +17,8 @@ export interface AdminBookRequestRow {
   status: string
   statusLabel: string
   orderId: number | null
+  arrivedAt: string | null
+  receivedAt: string | null
 }
 
 export interface OrderItemResponse {
@@ -61,6 +63,22 @@ export const markOrdered = (clubId: number, ids: number[]) =>
 
 export const markLocked = (clubId: number, ids: number[]) =>
   apiFetch<OrderResponse | null>(`/api/v1/admin/clubs/${clubId}/book-requests/mark-locked`, {
+    method: 'PATCH',
+    body: JSON.stringify({ ids }),
+  })
+
+export interface MarkResult {
+  affected: number
+}
+
+export const markArrived = (clubId: number, ids: number[]) =>
+  apiFetch<MarkResult>(`/api/v1/admin/clubs/${clubId}/book-requests/mark-arrived`, {
+    method: 'PATCH',
+    body: JSON.stringify({ ids }),
+  })
+
+export const markUnarrived = (clubId: number, ids: number[]) =>
+  apiFetch<MarkResult>(`/api/v1/admin/clubs/${clubId}/book-requests/mark-unarrived`, {
     method: 'PATCH',
     body: JSON.stringify({ ids }),
   })

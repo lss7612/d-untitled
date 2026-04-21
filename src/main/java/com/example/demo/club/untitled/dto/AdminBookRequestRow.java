@@ -3,6 +3,8 @@ package com.example.demo.club.untitled.dto;
 import com.example.demo.club.untitled.domain.BookRequest;
 import com.example.demo.user.domain.Member;
 
+import java.time.LocalDateTime;
+
 public record AdminBookRequestRow(
     Long id,
     Long memberId,
@@ -19,7 +21,9 @@ public record AdminBookRequestRow(
     String thumbnailUrl,
     String status,
     String statusLabel,
-    Long orderId
+    Long orderId,
+    LocalDateTime arrivedAt,
+    LocalDateTime receivedAt
 ) {
     public static AdminBookRequestRow of(BookRequest br, Member m) {
         return new AdminBookRequestRow(
@@ -38,7 +42,9 @@ public record AdminBookRequestRow(
             br.getThumbnailUrl(),
             br.getStatus().name(),
             br.getStatus().getLabel(),
-            br.getOrderId()
+            br.getOrderId(),
+            br.getArrivedAt(),
+            br.getReceivedAt()
         );
     }
 }

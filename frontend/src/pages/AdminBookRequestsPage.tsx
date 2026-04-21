@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import AppHeader from '@/components/AppHeader'
 import { Button } from '@/components/ui/button'
+import { CheckboxRow } from '@/components/ui/checkbox-row'
 import {
   useAdminBookRequests,
   useOrder,
@@ -291,15 +292,9 @@ export default function AdminBookRequestsPage() {
         <section className="rounded-xl border border-zinc-800/40 bg-zinc-900/50 p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-medium text-zinc-200">전체 신청 ({rows?.length ?? 0}건)</p>
-            <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={allChecked}
-                onChange={toggleAll}
-                className="accent-amber-500"
-              />
+            <CheckboxRow checked={allChecked} onChange={() => toggleAll()} className="px-3 py-2 text-xs text-zinc-400">
               전체 선택
-            </label>
+            </CheckboxRow>
           </div>
 
           {isLoading && <p className="text-sm text-zinc-500">불러오는 중...</p>}
@@ -311,54 +306,49 @@ export default function AdminBookRequestsPage() {
               const groupChecked = g.rows.every((r) => selectedIds.has(r.id))
               return (
                 <div key={g.memberId} className="border border-zinc-800/40 rounded-lg overflow-hidden">
-                  <label className="flex items-center justify-between px-4 py-2 bg-zinc-950/40 cursor-pointer">
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={groupChecked}
-                        onChange={() => toggleGroup(g)}
-                        className="accent-amber-500"
-                      />
-                      <span className="text-sm font-medium text-zinc-200">{g.memberName}</span>
-                      <span className="text-xs text-zinc-500">
-                        {g.rows.length}권 · ₩{groupAmount.toLocaleString()}
-                      </span>
-                    </div>
-                  </label>
+                  <CheckboxRow
+                    checked={groupChecked}
+                    onChange={() => toggleGroup(g)}
+                    className="bg-zinc-950/40"
+                  >
+                    <span className="text-sm font-medium text-zinc-200">{g.memberName}</span>
+                    <span className="text-xs text-zinc-500">
+                      {g.rows.length}권 · ₩{groupAmount.toLocaleString()}
+                    </span>
+                  </CheckboxRow>
                   <ul>
                     {g.rows.map((r) => {
                       const isOrdered = r.status === 'ORDERED'
                       return (
                         <li
                           key={r.id}
-                          className={`flex items-center gap-3 px-4 py-2 border-t border-zinc-800/30 ${
+                          className={`border-t border-zinc-800/30 ${
                             isOrdered ? 'bg-emerald-950/20 opacity-70' : 'hover:bg-zinc-950/30'
                           }`}
                         >
-                          <input
-                            type="checkbox"
+                          <CheckboxRow
                             checked={selectedIds.has(r.id)}
                             onChange={() => toggleOne(r.id)}
-                            className="accent-amber-500"
-                          />
-                          {r.thumbnailUrl && (
-                            <img src={r.thumbnailUrl} alt={r.title} className="w-8 h-10 object-cover rounded border border-zinc-800" />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-sm truncate ${isOrdered ? 'text-zinc-400' : 'text-zinc-200'}`}>
-                              {r.title}
-                              {isOrdered && (
-                                <span className="ml-2 text-xs text-emerald-400">✓ 신청완료</span>
-                              )}
-                            </p>
-                            <p className="text-xs text-zinc-500 truncate">
-                              {r.author} · {r.categoryLabel} · {r.statusLabel}
-                              {!r.aladinItemCode && r.status === 'LOCKED' && (
-                                <span className="text-amber-400 ml-1">· (K-CODE 없음)</span>
-                              )}
-                            </p>
-                          </div>
-                          <p className="text-sm text-zinc-300 whitespace-nowrap">₩{r.price.toLocaleString()}</p>
+                          >
+                            {r.thumbnailUrl && (
+                              <img src={r.thumbnailUrl} alt={r.title} className="w-8 h-10 object-cover rounded border border-zinc-800" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm truncate ${isOrdered ? 'text-zinc-400' : 'text-zinc-200'}`}>
+                                {r.title}
+                                {isOrdered && (
+                                  <span className="ml-2 text-xs text-emerald-400">✓ 신청완료</span>
+                                )}
+                              </p>
+                              <p className="text-xs text-zinc-500 truncate">
+                                {r.author} · {r.categoryLabel} · {r.statusLabel}
+                                {!r.aladinItemCode && r.status === 'LOCKED' && (
+                                  <span className="text-amber-400 ml-1">· (K-CODE 없음)</span>
+                                )}
+                              </p>
+                            </div>
+                            <p className="text-sm text-zinc-300 whitespace-nowrap">₩{r.price.toLocaleString()}</p>
+                          </CheckboxRow>
                         </li>
                       )
                     })}

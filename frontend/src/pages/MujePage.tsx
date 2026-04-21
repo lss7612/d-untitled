@@ -108,6 +108,16 @@ export default function MujePage() {
                     <p className="text-xs text-zinc-500 mt-0.5">월별 작성률 / 미제출자 명단</p>
                   </div>
                 </button>
+                <button
+                  onClick={() => navigate('/muje/admin/arrivals')}
+                  className="rounded-xl border border-amber-900/40 bg-amber-950/20 p-5 flex items-center gap-3 hover:bg-amber-950/30 transition-colors cursor-pointer text-left"
+                >
+                  <span className="text-2xl">📦</span>
+                  <div>
+                    <p className="text-sm text-zinc-200">도착 / 수령 관리</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">도착한 책 처리 + 미수령자 확인</p>
+                  </div>
+                </button>
               </div>
             </section>
           )}

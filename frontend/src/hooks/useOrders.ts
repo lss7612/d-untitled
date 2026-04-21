@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { fetchAdminBookRequests, fetchOrder, markOrdered, markLocked } from '@/api/orders'
+import { fetchAdminBookRequests, fetchOrder, markOrdered, markLocked, markArrived, markUnarrived } from '@/api/orders'
 
 export function useAdminBookRequests(clubId: number, yearMonth?: string) {
   return useQuery({
@@ -35,6 +35,22 @@ export function useMarkLocked(clubId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (ids: number[]) => markLocked(clubId, ids),
+    onSuccess: () => invalidateAll(qc, clubId),
+  })
+}
+
+export function useMarkArrived(clubId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (ids: number[]) => markArrived(clubId, ids),
+    onSuccess: () => invalidateAll(qc, clubId),
+  })
+}
+
+export function useMarkUnarrived(clubId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (ids: number[]) => markUnarrived(clubId, ids),
     onSuccess: () => invalidateAll(qc, clubId),
   })
 }

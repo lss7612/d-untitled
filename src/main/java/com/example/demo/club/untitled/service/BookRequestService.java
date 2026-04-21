@@ -178,4 +178,64 @@ public class BookRequestService {
         locked.forEach(br -> br.changeStatus(BookRequestStatus.PENDING));
         return locked.size();
     }
+
+    /** 관리자: 선택한 신청들을 ORDERED → ARRIVED. */
+    @Transactional
+    public int markArrived(Long clubId, Long adminMemberId, List<Long> ids) {
+        clubService.requireAdmin(clubId, adminMemberId);
+        return mutateStatuses(clubId, ids, BookRequestStatus.ORDERED, BookRequest::markArrived);
+    }
+
+    /** 관리자: 선택한 신청들을 ARRIVED → ORDERED (도착 처리 취소). */
+    @Transactional
+    public int markUnarrived(Long clubId, Long adminMemberId, List<Long> ids) {
+        clubService.requireAdmin(clubId, adminMemberId);
+        return mutateStatuses(clubId, ids, BookRequestStatus.ARRIVED, BookRequest::markUnarrived);
+    }
+
+    /** 회원 본인: 선택한 책들을 ARRIVED → RECEIVED. */
+    @Transactional
+    public int markReceived(Long clubId, Long memberId, List<Long> ids) {
+        clubService.requireMembership(clubId, memberId);
+        if (ids == null || ids.isEmpty()) {
+            throw new BusinessException("선택한 책이 없습니다.", 400);
+        }
+        List<BookRequest> targets = bookRequestRepository.findAllById(ids);
+        if (targets.size() != ids.size()) {
+            throw new BusinessException("일부 신청을 찾을 수 없습니다.", 404);
+        }
+        for (BookRequest br : targets) {
+            if (!br.getClubId().equals(clubId)) {
+                throw new BusinessException("다른 동호회의 신청이 포함되었습니다.", 400);
+            }
+            if (!br.getMemberId().equals(memberId)) {
+                throw new BusinessException("본인이 신청한 책만 수령 처리할 수 있습니다.", 403);
+            }
+            if (br.getStatus() != BookRequestStatus.ARRIVED) {
+                throw new BusinessException("ARRIVED 상태가 아닌 신청이 포함되었습니다: " + br.getStatus().getLabel(), 400);
+            }
+        }
+        targets.forEach(BookRequest::markReceived);
+        return targets.size();
+    }
+
+    private int mutateStatuses(Long clubId, List<Long> ids, BookRequestStatus expected, java.util.function.Consumer<BookRequest> mutator) {
+        if (ids == null || ids.isEmpty()) {
+            throw new BusinessException("선택한 책이 없습니다.", 400);
+        }
+        List<BookRequest> targets = bookRequestRepository.findAllById(ids);
+        if (targets.size() != ids.size()) {
+            throw new BusinessException("일부 신청을 찾을 수 없습니다.", 404);
+        }
+        for (BookRequest br : targets) {
+            if (!br.getClubId().equals(clubId)) {
+                throw new BusinessException("다른 동호회의 신청이 포함되었습니다.", 400);
+            }
+            if (br.getStatus() != expected) {
+                throw new BusinessException(expected.getLabel() + " 상태가 아닌 신청이 포함되었습니다: " + br.getStatus().getLabel(), 400);
+            }
+        }
+        targets.forEach(mutator);
+        return targets.size();
+    }
 }

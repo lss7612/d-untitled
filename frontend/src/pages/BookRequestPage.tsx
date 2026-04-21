@@ -8,8 +8,10 @@ import {
   useParseBookUrl,
   useCreateBookRequest,
   useDeleteBookRequest,
+  useMarkReceived,
 } from '@/hooks/useBookRequests'
 import { useMyClubs } from '@/hooks/useClubs'
+import { CheckboxRow } from '@/components/ui/checkbox-row'
 import { BOOK_CATEGORIES, type BookCategory, type ParsedBookResponse } from '@/api/bookRequests'
 
 const MUJE_CLUB_ID = 1
@@ -23,6 +25,8 @@ export default function BookRequestPage() {
   const { data: my, isLoading } = useMyBookRequests(MUJE_CLUB_ID)
   const { data: myClubs } = useMyClubs()
   const parseMut = useParseBookUrl(MUJE_CLUB_ID)
+  const markReceivedMut = useMarkReceived(MUJE_CLUB_ID)
+  const [receiveSelected, setReceiveSelected] = useState<Set<number>>(new Set())
   const createMut = useCreateBookRequest(MUJE_CLUB_ID)
   const deleteMut = useDeleteBookRequest(MUJE_CLUB_ID)
 
@@ -190,6 +194,78 @@ export default function BookRequestPage() {
             </div>
           </div>
         )}
+
+        {/* 도착한 내 책 — 수령 처리 */}
+        {(() => {
+          const arrived = (my?.requests ?? []).filter((br) => br.status === 'ARRIVED')
+          if (arrived.length === 0) return null
+          const allChecked = arrived.length > 0 && arrived.every((br) => receiveSelected.has(br.id))
+          function toggleAllArrived() {
+            setReceiveSelected(allChecked ? new Set() : new Set(arrived.map((br) => br.id)))
+          }
+          function toggleOne(id: number) {
+            const next = new Set(receiveSelected)
+            if (next.has(id)) next.delete(id)
+            else next.add(id)
+            setReceiveSelected(next)
+          }
+          function handleReceive() {
+            const ids = Array.from(receiveSelected)
+            if (ids.length === 0) return toast.warning('선택한 책이 없습니다.')
+            if (!confirm(`선택한 ${ids.length}권을 수령 완료 처리하시겠습니까?`)) return
+            markReceivedMut.mutate(ids, {
+              onSuccess: (r) => {
+                toast.success(`수령 완료 (${r.affected}권)`)
+                setReceiveSelected(new Set())
+              },
+              onError: (e) => toast.error(e.message),
+            })
+          }
+          return (
+            <section className="mb-6 rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-sm font-medium text-emerald-300">📦 도착한 내 책 ({arrived.length}권)</p>
+                  <p className="text-xs text-zinc-500 mt-1">받으신 책을 체크하고 수령 완료 처리하세요.</p>
+                </div>
+                <CheckboxRow
+                  checked={allChecked}
+                  onChange={() => toggleAllArrived()}
+                  className="px-3 py-2 text-xs text-zinc-400"
+                >
+                  전체 선택
+                </CheckboxRow>
+              </div>
+              <ul className="space-y-1">
+                {arrived.map((br) => (
+                  <li key={br.id} className="border-t border-zinc-800/30">
+                    <CheckboxRow checked={receiveSelected.has(br.id)} onChange={() => toggleOne(br.id)}>
+                      {br.thumbnailUrl && (
+                        <img src={br.thumbnailUrl} alt={br.title} className="w-10 h-12 object-cover rounded border border-zinc-800" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-zinc-200 truncate">{br.title}</p>
+                        <p className="text-xs text-zinc-500 truncate">
+                          {br.author}
+                          {br.arrivedAt && (
+                            <span className="ml-2 text-amber-400">
+                              · 도착 {new Date(br.arrivedAt).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit' })}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </CheckboxRow>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-3 flex justify-end">
+                <Button onClick={handleReceive} disabled={receiveSelected.size === 0 || markReceivedMut.isPending}>
+                  {markReceivedMut.isPending ? '처리 중...' : `선택한 ${receiveSelected.size}권 수령 완료`}
+                </Button>
+              </div>
+            </section>
+          )
+        })()}
 
         {/* 내 신청 목록 */}
         <section>

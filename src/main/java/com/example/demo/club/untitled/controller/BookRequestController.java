@@ -81,4 +81,17 @@ public class BookRequestController {
         bookRequestService.delete(clubId, member.getId(), id);
         return ApiResponse.ok(null);
     }
+
+    /** 회원: 본인의 ARRIVED 책들을 RECEIVED로 처리. */
+    @PatchMapping("/book-requests/mark-received")
+    public ApiResponse<MarkReceivedResult> markReceived(
+        @PathVariable Long clubId,
+        @RequestBody MarkRequest req,
+        @AuthenticationPrincipal Member member
+    ) {
+        int count = bookRequestService.markReceived(clubId, member.getId(), req.ids());
+        return ApiResponse.ok(new MarkReceivedResult(count));
+    }
+
+    public record MarkReceivedResult(int affected) {}
 }

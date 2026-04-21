@@ -23,7 +23,9 @@ public record BookRequestResponse(
     String status,
     String statusLabel,
     String targetMonth,
-    LocalDateTime createdAt
+    LocalDateTime createdAt,
+    LocalDateTime arrivedAt,
+    LocalDateTime receivedAt
 ) {
     public static BookRequestResponse from(BookRequest br) {
         return new BookRequestResponse(
@@ -44,7 +46,9 @@ public record BookRequestResponse(
             br.getStatus().name(),
             br.getStatus().getLabel(),
             br.getTargetMonth(),
-            br.getCreatedAt()
+            br.getCreatedAt(),
+            br.getArrivedAt(),
+            br.getReceivedAt()
         );
     }
 }
