@@ -8,6 +8,9 @@ import AllClubsPage from '@/pages/AllClubsPage'
 import ClubsPage from '@/pages/ClubsPage'
 import MujePage from '@/pages/MujePage'
 import BookRequestPage from '@/pages/BookRequestPage'
+import BookReportPage from '@/pages/BookReportPage'
+import AdminBookRequestsPage from '@/pages/AdminBookRequestsPage'
+import AdminBookReportsPage from '@/pages/AdminBookReportsPage'
 import ProtectedRoute from '@/components/ProtectedRoute'
 
 function App() {
@@ -24,6 +27,9 @@ function App() {
             <Route path="/clubs" element={<ClubsPage />} />
             <Route path="/muje" element={<MujePage />} />
             <Route path="/muje/book-requests" element={<BookRequestPage />} />
+            <Route path="/muje/book-reports" element={<BookReportPage />} />
+            <Route path="/muje/admin/book-requests" element={<AdminBookRequestsPage />} />
+            <Route path="/muje/admin/book-reports" element={<AdminBookReportsPage />} />
           </Route>
         </Routes>
         <Toaster />

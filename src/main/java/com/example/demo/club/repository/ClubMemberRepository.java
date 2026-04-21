@@ -8,6 +8,7 @@ import java.util.Optional;
 
 public interface ClubMemberRepository extends JpaRepository<ClubMember, Long> {
     List<ClubMember> findAllByMemberId(Long memberId);
+    List<ClubMember> findAllByClubId(Long clubId);
     Optional<ClubMember> findByClubIdAndMemberId(Long clubId, Long memberId);
     boolean existsByClubIdAndMemberId(Long clubId, Long memberId);
 }
