@@ -33,10 +33,9 @@ export default function ClubsPage() {
 
         <div className="grid gap-3">
           {clubs?.map((club) => (
+            <div key={club.id} onClick={() => handleClubClick(club)} className="cursor-pointer">
             <MagicCard
-              key={club.id}
-              onClick={() => handleClubClick(club)}
-              className="cursor-pointer p-5 rounded-xl border border-zinc-800/40 bg-zinc-900/50"
+              className="p-5 rounded-xl border border-zinc-800/40 bg-zinc-900/50"
               gradientColor="#27272a"
             >
               <div className="flex items-center gap-4">
@@ -52,6 +51,7 @@ export default function ClubsPage() {
                 </div>
               </div>
             </MagicCard>
+            </div>
           ))}
         </div>
       </main>

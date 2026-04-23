@@ -62,7 +62,11 @@ public class Member {
         this.emailVerified = true;
     }
 
+    public void assignRole(Role role) {
+        this.role = role;
+    }
+
     public enum Role {
-        MEMBER, ADMIN
+        MEMBER, ADMIN, DEVELOPER
     }
 }
