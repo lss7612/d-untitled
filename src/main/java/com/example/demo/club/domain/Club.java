@@ -27,7 +27,7 @@ public class Club {
     private String description;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "VARCHAR(30)")
     private ClubType type;
 
     @CreatedDate

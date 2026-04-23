@@ -25,25 +25,30 @@ public class ClubService {
     private final ClubMemberRepository clubMemberRepository;
 
     public List<ClubResponse> findAll(Long memberId) {
-        Map<Long, ClubRole> myMemberships = clubMemberRepository.findAllByMemberId(memberId).stream()
-            .collect(Collectors.toMap(ClubMember::getClubId, ClubMember::getRole));
+        Map<Long, ClubMember> myMemberships = clubMemberRepository.findAllByMemberId(memberId).stream()
+            .collect(Collectors.toMap(ClubMember::getClubId, cm -> cm));
         return clubRepository.findAll().stream()
             .map(c -> ClubResponse.of(c, myMemberships.get(c.getId())))
             .toList();
     }
 
     public List<ClubResponse> findMine(Long memberId) {
-        List<ClubMember> myMemberships = clubMemberRepository.findAllByMemberId(memberId);
-        Map<Long, ClubRole> roleByClub = myMemberships.stream()
-            .collect(Collectors.toMap(ClubMember::getClubId, ClubMember::getRole));
-        return clubRepository.findAllById(roleByClub.keySet()).stream()
-            .map(c -> ClubResponse.of(c, roleByClub.get(c.getId())))
+        List<ClubMember> myActive = clubMemberRepository.findAllByMemberId(memberId).stream()
+            .filter(ClubMember::isActive)
+            .toList();
+        Map<Long, ClubMember> byClub = myActive.stream()
+            .collect(Collectors.toMap(ClubMember::getClubId, cm -> cm));
+        return clubRepository.findAllById(byClub.keySet()).stream()
+            .map(c -> ClubResponse.of(c, byClub.get(c.getId())))
             .toList();
     }
 
     public Club requireMembership(Long clubId, Long memberId) {
-        clubMemberRepository.findByClubIdAndMemberId(clubId, memberId)
+        ClubMember cm = clubMemberRepository.findByClubIdAndMemberId(clubId, memberId)
             .orElseThrow(() -> new BusinessException("동호회에 가입되지 않았습니다.", 403));
+        if (!cm.isActive()) {
+            throw new BusinessException("가입 승인 대기 중입니다.", 403);
+        }
         return clubRepository.findById(clubId)
             .orElseThrow(() -> new BusinessException("동호회를 찾을 수 없습니다.", 404));
     }
@@ -51,6 +56,9 @@ public class ClubService {
     public ClubMember requireAdmin(Long clubId, Long memberId) {
         ClubMember cm = clubMemberRepository.findByClubIdAndMemberId(clubId, memberId)
             .orElseThrow(() -> new BusinessException("동호회에 가입되지 않았습니다.", 403));
+        if (!cm.isActive()) {
+            throw new BusinessException("가입 승인 대기 중입니다.", 403);
+        }
         if (cm.getRole() != ClubRole.ADMIN) {
             throw new BusinessException("관리자 권한이 필요합니다.", 403);
         }

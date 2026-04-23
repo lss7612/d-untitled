@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import AppHeader from '@/components/AppHeader'
 import { MagicCard } from '@/components/ui/magic-card'
-import { useAllClubs } from '@/hooks/useClubs'
+import { useAllClubs, useRequestJoin } from '@/hooks/useClubs'
 import type { ClubResponse } from '@/api/clubs'
 
 const CLUB_EMOJI: Record<string, string> = {
@@ -12,9 +13,48 @@ const CLUB_EMOJI: Record<string, string> = {
 export default function AllClubsPage() {
   const navigate = useNavigate()
   const { data: clubs, isLoading, error } = useAllClubs()
+  const joinMutation = useRequestJoin()
 
   function handleClubClick(club: ClubResponse) {
+    if (!club.joined) {
+      if (club.joinStatus === 'PENDING') {
+        toast.info('가입 승인 대기 중입니다.')
+        return
+      }
+      toast.info('가입 신청 후 관리자 승인을 받아야 입장할 수 있어요.')
+      return
+    }
     if (club.name === '무제') navigate('/muje')
+  }
+
+  function handleJoinClick(e: React.MouseEvent, club: ClubResponse) {
+    e.stopPropagation()
+    joinMutation.mutate(club.id, {
+      onSuccess: () => toast.success(`${club.name} 가입 신청 완료. 관리자 승인을 기다려주세요.`),
+      onError: (err: Error) => toast.error(err.message || '가입 신청에 실패했습니다.'),
+    })
+  }
+
+  function renderAction(club: ClubResponse) {
+    if (club.joined) {
+      return (
+        <span className="text-xs text-emerald-400">
+          {club.myRole === 'ADMIN' ? '관리자' : '가입됨'}
+        </span>
+      )
+    }
+    if (club.joinStatus === 'PENDING') {
+      return <span className="text-xs text-amber-400">승인 대기중</span>
+    }
+    return (
+      <button
+        onClick={(e) => handleJoinClick(e, club)}
+        disabled={joinMutation.isPending}
+        className="rounded-lg bg-zinc-700 hover:bg-zinc-600 px-3 py-1.5 text-xs font-medium text-zinc-100 transition-colors disabled:opacity-50"
+      >
+        가입 신청
+      </button>
+    )
   }
 
   return (
@@ -38,16 +78,10 @@ export default function AllClubsPage() {
                 <div className="flex items-center gap-4">
                   <span className="text-2xl">{CLUB_EMOJI[club.type] ?? '🏷'}</span>
                   <div className="flex-1">
-                    <p className="font-medium text-zinc-200">
-                      {club.name}
-                      {club.joined && (
-                        <span className="ml-2 text-xs text-emerald-400 align-middle">
-                          {club.myRole === 'ADMIN' ? '관리자' : '가입'}
-                        </span>
-                      )}
-                    </p>
+                    <p className="font-medium text-zinc-200">{club.name}</p>
                     <p className="text-sm text-zinc-500 mt-0.5">{club.description}</p>
                   </div>
+                  <div className="shrink-0">{renderAction(club)}</div>
                 </div>
               </MagicCard>
             </div>

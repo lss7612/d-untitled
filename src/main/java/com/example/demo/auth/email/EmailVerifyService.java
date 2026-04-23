@@ -46,7 +46,7 @@ public class EmailVerifyService {
             mailSender.send(message);
             log.info("[EmailVerify] 인증 코드 발송 완료 email={}", email);
         } catch (Exception e) {
-            log.warn("[EmailVerify] 메일 발송 실패 (위 DEV CODE 사용) email={} reason={}", email, e.getMessage());
+            log.warn("[EmailVerify] 메일 발송 실패 (code={}) email={} reason={}", code, email, e.getMessage());
         }
     }
 
@@ -73,7 +73,7 @@ public class EmailVerifyService {
                 .orElseThrow(() -> new BusinessException("회원 정보를 찾을 수 없습니다.", 404));
         member.verifyEmail();
 
-        clubMembershipService.autoEnroll(member);
+        clubMembershipService.onAuthenticated(member);
 
         return jwtTokenProvider.generateToken(member.getId(), true);
     }
