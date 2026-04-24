@@ -17,6 +17,7 @@ public record BookExemptionResponse(
     String memberEmail,
     String reason,
     String status,
+    String sourceType,
     LocalDateTime createdAt,
     LocalDateTime processedAt
 ) {
@@ -32,6 +33,7 @@ public record BookExemptionResponse(
             member == null ? null : member.getEmail(),
             req.getReason(),
             req.getStatus().name(),
+            req.getSourceType() == null ? null : req.getSourceType().name(),
             req.getCreatedAt(),
             req.getProcessedAt()
         );

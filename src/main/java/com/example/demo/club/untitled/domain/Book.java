@@ -105,6 +105,23 @@ public class Book {
         return b;
     }
 
+    /**
+     * 아직 아무도 수령하지 않은 "카탈로그 선반영" 용 팩토리. 제한풀기(exemption) 플로우에서
+     * book_request 충돌이나 관리자 URL 해제 시 쓴다. RECEIVED 전이에서 {@link #incrementCopies()} 로 1 이상 된다.
+     */
+    public static Book ofCatalogPreentry(Long clubId, String title, String author,
+                                          BigDecimal price, String sourceUrl, String thumbnailUrl) {
+        Book b = new Book();
+        b.clubId = clubId;
+        b.title = title;
+        b.author = author;
+        b.price = price;
+        b.sourceUrl = sourceUrl;
+        b.thumbnailUrl = thumbnailUrl;
+        b.copies = 0;
+        return b;
+    }
+
     /** 제한풀기 신청이 승인되면 호출 — 이후 중복 체크에서 이 책은 제외된다. */
     public void grantExemption() {
         this.exemptionGrantedAt = LocalDateTime.now();

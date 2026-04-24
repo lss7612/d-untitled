@@ -22,7 +22,10 @@ import { useMe } from '@/hooks/useMe'
 import { useMyClubs } from '@/hooks/useClubs'
 import { CheckboxRow } from '@/components/ui/checkbox-row'
 import { BOOK_CATEGORIES, type BookCategory, type ParsedBookResponse } from '@/api/bookRequests'
-import { useRequestBookExemption } from '@/hooks/useBookExemptions'
+import {
+  useRequestBookExemption,
+  useRequestBookExemptionByUrl,
+} from '@/hooks/useBookExemptions'
 import type { ApiError } from '@/api/client'
 
 const MUJE_CLUB_ID = 1
@@ -42,11 +45,19 @@ export default function BookRequestPage() {
   const createMut = useCreateBookRequest(MUJE_CLUB_ID)
   const deleteMut = useDeleteBookRequest(MUJE_CLUB_ID)
   const exemptionMut = useRequestBookExemption(MUJE_CLUB_ID)
+  const exemptionByUrlMut = useRequestBookExemptionByUrl(MUJE_CLUB_ID)
 
   // 중복 책 에러 상태 (duplicate detected -> 제한풀기 버튼 노출)
   const [duplicateBook, setDuplicateBook] = useState<{
     id: number
     title: string
+  } | null>(null)
+  // 같은 달 타 회원 신청과 충돌 시 — bookId 가 없어 URL 을 다시 써야 한다.
+  const [monthlyConflict, setMonthlyConflict] = useState<{
+    url: string
+    bookTitle: string
+    requesterName: string
+    requesterEmail: string | null
   } | null>(null)
   const [exemptionReason, setExemptionReason] = useState('')
 
@@ -70,7 +81,8 @@ export default function BookRequestPage() {
 
   function handleCreate() {
     if (!parsed) return
-    setDuplicateBook(null) // 기존 중복 카드 초기화
+    setDuplicateBook(null)
+    setMonthlyConflict(null)
     createMut.mutate(
       { url: parsed.sourceUrl, category },
       {
@@ -79,6 +91,7 @@ export default function BookRequestPage() {
           setUrl('')
           setParsed(null)
           setDuplicateBook(null)
+          setMonthlyConflict(null)
         },
         onError: (e) => {
           const err = e as ApiError
@@ -86,6 +99,16 @@ export default function BookRequestPage() {
             setDuplicateBook({
               id: Number(err.details.duplicateBookId),
               title: String(err.details.duplicateBookTitle ?? parsed.title),
+            })
+            toast.error(err.message)
+          } else if (err.details?.code === 'DUPLICATE_MONTHLY_REQUEST') {
+            setMonthlyConflict({
+              url: parsed.sourceUrl,
+              bookTitle: String(err.details.bookTitle ?? parsed.title),
+              requesterName: String(err.details.requesterName ?? '다른 회원'),
+              requesterEmail: err.details.requesterEmail
+                ? String(err.details.requesterEmail)
+                : null,
             })
             toast.error(err.message)
           } else {
@@ -104,6 +127,21 @@ export default function BookRequestPage() {
         onSuccess: () => {
           toast.success('제한풀기 신청이 접수되었습니다. 관리자 승인을 기다려주세요.')
           setDuplicateBook(null)
+          setExemptionReason('')
+        },
+        onError: (e) => toast.error(e.message),
+      }
+    )
+  }
+
+  function handleRequestExemptionByUrl() {
+    if (!monthlyConflict) return
+    exemptionByUrlMut.mutate(
+      { url: monthlyConflict.url, reason: exemptionReason.trim() || undefined },
+      {
+        onSuccess: () => {
+          toast.success('제한풀기 신청이 접수되었습니다. 관리자 승인을 기다려주세요.')
+          setMonthlyConflict(null)
           setExemptionReason('')
         },
         onError: (e) => toast.error(e.message),
@@ -456,6 +494,64 @@ export default function BookRequestPage() {
                 disabled={exemptionMut.isPending}
               >
                 {exemptionMut.isPending ? '신청 중...' : '제한풀기 신청'}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* 같은 달 타 회원 신청 충돌 경고 + 제한풀기 신청 */}
+        {monthlyConflict && (
+          <div className="mb-8 rounded-xl border border-amber-900/50 bg-amber-950/30 p-5">
+            <div className="flex items-start gap-3">
+              <span className="text-lg leading-none">⚠️</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-amber-200">
+                  이번 달 다른 회원이 이미 신청한 책입니다
+                </p>
+                <p className="text-sm text-amber-100/80 mt-1 truncate">
+                  「{monthlyConflict.bookTitle}」
+                  <span className="text-amber-300/80">
+                    {' · '}
+                    {monthlyConflict.requesterName}
+                    {monthlyConflict.requesterEmail ? `(${monthlyConflict.requesterEmail})` : ''}님
+                  </span>
+                </p>
+                <p className="text-xs text-amber-300/70 mt-2">
+                  같은 책이지만 꼭 한 번 더 신청하고 싶다면, 사유를 적어
+                  관리자에게 제한풀기를 신청할 수 있습니다. 승인되면 같은 책도
+                  중복 없이 신청할 수 있습니다.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4">
+              <label className="block text-xs text-amber-300/80 mb-2">
+                제한풀기 사유 <span className="text-amber-400/60">(선택)</span>
+              </label>
+              <textarea
+                value={exemptionReason}
+                onChange={(e) => setExemptionReason(e.target.value)}
+                placeholder="예: 여러 명이 돌려 읽고 싶습니다."
+                rows={3}
+                maxLength={500}
+                className="w-full px-3 py-2 rounded-lg border border-amber-900/50 bg-zinc-950 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-700"
+              />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setMonthlyConflict(null)
+                  setExemptionReason('')
+                }}
+                disabled={exemptionByUrlMut.isPending}
+              >
+                닫기
+              </Button>
+              <Button
+                onClick={handleRequestExemptionByUrl}
+                disabled={exemptionByUrlMut.isPending}
+              >
+                {exemptionByUrlMut.isPending ? '신청 중...' : '제한풀기 신청'}
               </Button>
             </div>
           </div>

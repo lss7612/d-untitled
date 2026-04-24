@@ -6,8 +6,11 @@ import com.example.demo.club.untitled.domain.BookExemptionRequest;
 import com.example.demo.club.untitled.domain.BookExemptionRequest.Status;
 import com.example.demo.club.untitled.dto.BookExemptionResponse;
 import com.example.demo.club.untitled.dto.BookResponse;
+import com.example.demo.club.untitled.external.AladinApiClient;
+import com.example.demo.club.untitled.external.ParsedBook;
 import com.example.demo.club.untitled.repository.BookExemptionRequestRepository;
 import com.example.demo.club.untitled.repository.BookRepository;
+import com.example.demo.club.untitled.util.BookNames;
 import com.example.demo.common.exception.BusinessException;
 import com.example.demo.user.domain.Member;
 import com.example.demo.user.repository.MemberRepository;
@@ -40,6 +43,7 @@ public class BookExemptionService {
     private final BookRepository bookRepository;
     private final MemberRepository memberRepository;
     private final ClubService clubService;
+    private final AladinApiClient aladinApiClient;
 
     @Transactional
     public BookExemptionResponse request(Long clubId, Long bookId, String reason, Member caller) {
@@ -63,6 +67,33 @@ public class BookExemptionService {
             BookExemptionRequest.of(clubId, bookId, caller.getId(), reason));
         log.info("[BookExemption] 신청 clubId={} bookId={} memberId={}",
             clubId, bookId, caller.getId());
+        return BookExemptionResponse.of(saved, book, caller);
+    }
+
+    /**
+     * 카탈로그에 아직 없는 책(예: 다른 회원의 동월 PENDING 과 충돌) 에 대한 제한풀기 신청.
+     * 알라딘 URL 을 파싱해 {@link Book} 을 copies=0 으로 선반영한 뒤 기존 제한풀기 메커니즘을 탄다.
+     */
+    @Transactional
+    public BookExemptionResponse requestByUrl(Long clubId, String url, String reason, Member caller) {
+        clubService.requireMembership(clubId, caller.getId());
+
+        ParsedBook parsed = aladinApiClient.parse(url);
+        Book book = findOrCreatePreentry(clubId, parsed);
+
+        if (book.isExempt()) {
+            throw new BusinessException("이미 제한이 해제된 책입니다. 바로 신청할 수 있습니다.", 400);
+        }
+
+        exemptionRepository.findByClubIdAndBookIdAndStatus(clubId, book.getId(), Status.PENDING)
+            .ifPresent(r -> {
+                throw new BusinessException("이미 대기 중인 제한풀기 신청이 있습니다.", 409);
+            });
+
+        BookExemptionRequest saved = exemptionRepository.save(
+            BookExemptionRequest.of(clubId, book.getId(), caller.getId(), reason));
+        log.info("[BookExemption] URL 신청 clubId={} bookId={} memberId={}",
+            clubId, book.getId(), caller.getId());
         return BookExemptionResponse.of(saved, book, caller);
     }
 
@@ -116,6 +147,59 @@ public class BookExemptionService {
             .stream()
             .map(BookResponse::from)
             .toList();
+    }
+
+    /**
+     * 관리자: 알라딘 URL 을 직접 붙여 즉시 제한풀기(선제적 해제).
+     * PENDING 신청이 없어도 바로 APPROVED 이력을 만들고 {@link Book#grantExemption()} 을 호출한다.
+     * 이미 exempt 인 책이면 idempotent 하게 현재 상태를 반환 (새 row 생성 안 함).
+     */
+    @Transactional
+    public BookExemptionResponse proactiveExemptByUrl(Long clubId, String url, String reason, Member admin) {
+        clubService.requireAdmin(clubId, admin.getId(), admin);
+
+        ParsedBook parsed = aladinApiClient.parse(url);
+        Book book = findOrCreatePreentry(clubId, parsed);
+
+        if (book.isExempt()) {
+            // 기존 최신 APPROVED 이력을 반환 (없으면 null book-less row 로는 반환 불가하므로 book 만으로 구성).
+            BookExemptionRequest latest = exemptionRepository
+                .findTopByClubIdAndBookIdAndStatusOrderByCreatedAtDesc(clubId, book.getId(), Status.APPROVED)
+                .orElse(null);
+            log.info("[BookExemption] URL proactive idempotent clubId={} bookId={} by={}",
+                clubId, book.getId(), admin.getId());
+            if (latest == null) {
+                // 레거시 exempt 데이터(이력 없이 Book 에만 exemption_granted_at 박힌 경우) 대응.
+                return BookExemptionResponse.of(
+                    BookExemptionRequest.ofAdminProactive(clubId, book.getId(), admin.getId(), reason),
+                    book, admin);
+            }
+            Member requester = memberRepository.findById(latest.getMemberId()).orElse(null);
+            return BookExemptionResponse.of(latest, book, requester);
+        }
+
+        book.grantExemption();
+        BookExemptionRequest saved = exemptionRepository.save(
+            BookExemptionRequest.ofAdminProactive(clubId, book.getId(), admin.getId(), reason));
+        log.info("[BookExemption] URL proactive 승인 clubId={} bookId={} by={}",
+            clubId, book.getId(), admin.getId());
+        return BookExemptionResponse.of(saved, book, admin);
+    }
+
+    /** 카탈로그에 정규화 키로 이미 있으면 반환, 없으면 copies=0 으로 신규 생성. */
+    private Book findOrCreatePreentry(Long clubId, ParsedBook parsed) {
+        String normTitle = BookNames.normalize(parsed.title());
+        String normAuthor = BookNames.normalize(parsed.author());
+        return bookRepository
+            .findByClubIdAndNormalizedTitleAndNormalizedAuthor(clubId, normTitle, normAuthor)
+            .orElseGet(() -> bookRepository.save(Book.ofCatalogPreentry(
+                clubId,
+                parsed.title(),
+                parsed.author(),
+                parsed.price(),
+                parsed.sourceUrl(),
+                parsed.thumbnailUrl()
+            )));
     }
 
     /**

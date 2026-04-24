@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import AppHeader from '@/components/AppHeader'
 import { Button } from '@/components/ui/button'
 import {
+  useAdminProactiveExemptByUrl,
   useExemptBooks,
   useRevokeBookExemption,
 } from '@/hooks/useBookExemptions'
@@ -13,6 +15,9 @@ export default function AdminExemptBooksPage() {
   const navigate = useNavigate()
   const { data: rows, isLoading } = useExemptBooks(MUJE_CLUB_ID)
   const revokeMut = useRevokeBookExemption(MUJE_CLUB_ID)
+  const proactiveMut = useAdminProactiveExemptByUrl(MUJE_CLUB_ID)
+  const [proactiveUrl, setProactiveUrl] = useState('')
+  const [proactiveReason, setProactiveReason] = useState('')
 
   function handleRevoke(bookId: number, title: string) {
     if (
@@ -25,6 +30,22 @@ export default function AdminExemptBooksPage() {
       onSuccess: () => toast.success('제한을 다시 적용했습니다.'),
       onError: (e) => toast.error(e.message),
     })
+  }
+
+  function handleProactiveExempt() {
+    const url = proactiveUrl.trim()
+    if (!url) return
+    proactiveMut.mutate(
+      { url, reason: proactiveReason.trim() || undefined },
+      {
+        onSuccess: (res) => {
+          toast.success(`「${res.bookTitle ?? '해당 책'}」 제한을 해제했습니다.`)
+          setProactiveUrl('')
+          setProactiveReason('')
+        },
+        onError: (e) => toast.error(e.message),
+      }
+    )
   }
 
   return (
@@ -45,6 +66,44 @@ export default function AdminExemptBooksPage() {
             ← 대시보드
           </Button>
         </div>
+
+        {/* 관리자 선제 제한풀기 (알라딘 URL) */}
+        <section className="mb-6 rounded-xl border border-amber-900/40 bg-amber-950/15 p-5">
+          <div className="mb-3">
+            <p className="text-sm font-medium text-amber-200">
+              알라딘 URL 로 바로 제한풀기
+            </p>
+            <p className="text-xs text-amber-300/70 mt-1">
+              회원 신청을 기다리지 않고, 관리자가 직접 URL 을 붙여 즉시 제한을 해제합니다.
+              카탈로그에 없는 책이면 자동으로 등록됩니다.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <input
+              type="url"
+              value={proactiveUrl}
+              onChange={(e) => setProactiveUrl(e.target.value)}
+              placeholder="https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=..."
+              className="px-3 py-2 rounded-lg border border-amber-900/50 bg-zinc-950 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-700"
+            />
+            <textarea
+              value={proactiveReason}
+              onChange={(e) => setProactiveReason(e.target.value)}
+              placeholder="사유 (선택) — 예: 동호회 전체 공유용"
+              rows={2}
+              maxLength={500}
+              className="px-3 py-2 rounded-lg border border-amber-900/50 bg-zinc-950 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-700"
+            />
+            <div className="flex justify-end">
+              <Button
+                onClick={handleProactiveExempt}
+                disabled={!proactiveUrl.trim() || proactiveMut.isPending}
+              >
+                {proactiveMut.isPending ? '처리 중...' : '즉시 제한풀기'}
+              </Button>
+            </div>
+          </div>
+        </section>
 
         {isLoading && <p className="text-sm text-zinc-500">불러오는 중...</p>}
 

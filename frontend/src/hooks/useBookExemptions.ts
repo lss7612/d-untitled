@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   requestBookExemption,
+  requestBookExemptionByUrl,
   fetchPendingBookExemptions,
   approveBookExemption,
   rejectBookExemption,
   fetchExemptBooks,
   revokeBookExemption,
+  adminProactiveExemptByUrl,
 } from '@/api/bookExemptions'
 
 export function useRequestBookExemption(clubId: number) {
@@ -15,6 +17,33 @@ export function useRequestBookExemption(clubId: number) {
       requestBookExemption(clubId, vars.bookId, vars.reason),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin', 'bookExemptions', clubId] })
+    },
+  })
+}
+
+/** 회원: 카탈로그에 없는 책(월별 book_request 충돌) 에 대한 제한풀기 신청. */
+export function useRequestBookExemptionByUrl(clubId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { url: string; reason?: string }) =>
+      requestBookExemptionByUrl(clubId, vars.url, vars.reason),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'bookExemptions', clubId] })
+    },
+  })
+}
+
+/** 관리자: 알라딘 URL 로 선제적 제한풀기. */
+export function useAdminProactiveExemptByUrl(clubId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { url: string; reason?: string }) =>
+      adminProactiveExemptByUrl(clubId, vars.url, vars.reason),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'exemptBooks', clubId] })
+      qc.invalidateQueries({ queryKey: ['admin', 'bookExemptions', clubId] })
+      qc.invalidateQueries({ queryKey: ['books', clubId] })
+      qc.invalidateQueries({ queryKey: ['bookRequests'] })
     },
   })
 }

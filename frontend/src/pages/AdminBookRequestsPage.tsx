@@ -37,9 +37,69 @@ function groupByMember(rows: AdminBookRequestRow[]): MemberGroup[] {
   return Array.from(map.values())
 }
 
-function buildAutomationScript(kCodes: string[]): string {
-  const codes = kCodes.join(',')
-  return `javascript:(async()=>{const codes='${codes}';const arr=codes.split(',').filter(Boolean);let ok=0;for(const c of arr){try{const r=await fetch('/shop/wbasket.aspx?AddBook='+c.trim(),{credentials:'include'});if(r.ok)ok++;}catch(e){}await new Promise(r=>setTimeout(r,300));}alert('알라딘 카트 담기 완료: '+ok+'/'+arr.length);})();`
+/**
+ * 카트 담기 대상 하나. 같은 책이 N권 선택된 경우 count=N 으로 집계되어 들어온다.
+ * kCode 는 AddBook 용, isbn 은 UpdateQty 용 (알라딘 내부 API 가 ISBN 기준 수량 조정).
+ */
+interface CartItem {
+  kCode: string
+  isbn: string
+  count: number
+}
+
+/**
+ * 알라딘 장바구니 자동화 스크립트.
+ *
+ * 알고리즘: 각 유니크 (K-code, qty) 마다 알라딘 실제 담기 엔드포인트 한 번 호출.
+ *   `GET /shop/BasketAjax.aspx?method=basketaddwithexistcheck&isbn=<K-code>&qty=<N>&_=<ts>`
+ *
+ * - 파라미터명은 `isbn` 이지만 실제 값은 **K-code** (알라딘 내부 컨벤션).
+ * - `qty` 로 한 번에 N권 담기. 기존 `AddBook` + `UpdateQty` 2단계는 K-code/ISBN 키 불일치로 실제 수량
+ *   반영이 안 되는 케이스가 있어 폐기.
+ * - 응답은 `{"Success":"true","Exist":"false","BranchType":..,"Title":"..","Price":"..."}` 형식.
+ *   실패면 `Success:"false"`. 이미 카트에 있는 동일 상품이면 `Exist:"true"`.
+ */
+function buildAutomationScript(items: CartItem[]): string {
+  // 스크립트 안으로 데이터 직렬화. BACKSLASH/QUOTE 이스케이프는 JSON.stringify 에 위임.
+  const json = JSON.stringify(items)
+  return `javascript:(async()=>{
+    const items=${json};
+    let ok=0,already=0,fail=0;const failLog=[];
+    for(const it of items){
+      const ts=Date.now();
+      const url='/shop/BasketAjax.aspx?method=basketaddwithexistcheck&isbn='+encodeURIComponent(it.kCode)+'&qty='+it.count+'&_='+ts;
+      try{
+        const r=await fetch(url,{credentials:'include',headers:{'Accept':'application/json, text/javascript, */*; q=0.01','X-Requested-With':'XMLHttpRequest'}});
+        const j=await r.json();
+        if(j.Success==='true'){
+          if(j.Exist==='true')already++;else ok++;
+        }else{
+          fail++;failLog.push(it.kCode+': '+(j.AlertMessage||'Success=false'));
+        }
+      }catch(e){fail++;failLog.push(it.kCode+': '+e);}
+      await new Promise(r=>setTimeout(r,300));
+    }
+    const total=items.reduce((s,x)=>s+x.count,0);
+    let msg='알라딘 카트 담기 완료\\n신규: '+ok+'종 · 이미있음: '+already+'종 · 실패: '+fail+'종\\n총 '+total+'권 요청 ('+items.length+'종)';
+    if(failLog.length)msg+='\\n\\n실패:\\n'+failLog.join('\\n');
+    alert(msg);
+  })();`.replace(/\n\s+/g, '')
+}
+
+/** 선택된 PENDING 행을 ISBN 기준으로 집계해 CartItem[] 로 변환. K-code 없거나 ISBN 없으면 제외. */
+function aggregateCartItems(rows: AdminBookRequestRow[]): CartItem[] {
+  const map = new Map<string, CartItem>()
+  for (const r of rows) {
+    if (!r.aladinItemCode || !r.isbn) continue
+    const key = r.isbn
+    const existing = map.get(key)
+    if (existing) {
+      existing.count += 1
+    } else {
+      map.set(key, { kCode: r.aladinItemCode, isbn: r.isbn, count: 1 })
+    }
+  }
+  return Array.from(map.values())
 }
 
 export default function AdminBookRequestsPage() {
@@ -94,10 +154,10 @@ export default function AdminBookRequestsPage() {
   const allSelectedArePending = selectedRows.length > 0 && pendingSelected.length === selectedRows.length
   const allSelectedAreOrdered = selectedRows.length > 0 && orderedSelected.length === selectedRows.length
 
-  // 카트 스크립트는 PENDING + K-CODE 있는 것만
-  const cartTargets = pendingSelected.filter((r) => !!r.aladinItemCode)
-  const cartTargetKCodes = cartTargets.map((r) => r.aladinItemCode as string)
-  const missingCodeCount = pendingSelected.length - cartTargets.length
+  // 카트 스크립트는 PENDING + K-CODE 있는 것만. 같은 책은 ISBN 기준 집계해 count=N 으로.
+  const cartItems = useMemo(() => aggregateCartItems(pendingSelected), [pendingSelected])
+  const cartItemTotalQty = cartItems.reduce((s, x) => s + x.count, 0)
+  const missingCodeCount = pendingSelected.length - cartItemTotalQty
 
   const locked = myMonth?.locked ?? false
 
@@ -118,11 +178,11 @@ export default function AdminBookRequestsPage() {
   }
 
   async function handleCopyScript() {
-    if (cartTargetKCodes.length === 0) {
-      toast.warning('카트에 담을 책이 없습니다 (신청 대기 + K-CODE 필요).')
+    if (cartItems.length === 0) {
+      toast.warning('카트에 담을 책이 없습니다 (신청 대기 + K-CODE + ISBN 필요).')
       return
     }
-    const script = buildAutomationScript(cartTargetKCodes)
+    const script = buildAutomationScript(cartItems)
     try {
       await navigator.clipboard.writeText(script)
       window.open('https://www.aladin.co.kr/', '_blank')
@@ -306,8 +366,8 @@ export default function AdminBookRequestsPage() {
           ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                <Button onClick={handleCopyScript} disabled={cartTargetKCodes.length === 0}>
-                  자동 카트 담기 스크립트 복사 ({cartTargetKCodes.length}권)
+                <Button onClick={handleCopyScript} disabled={cartItems.length === 0}>
+                  자동 카트 담기 스크립트 복사 ({cartItems.length}종 · 총 {cartItemTotalQty}권)
                 </Button>
                 <Button
                   onClick={handleMarkOrdered}

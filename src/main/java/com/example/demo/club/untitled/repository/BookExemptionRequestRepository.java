@@ -13,4 +13,8 @@ public interface BookExemptionRequestRepository extends JpaRepository<BookExempt
     Optional<BookExemptionRequest> findByClubIdAndBookIdAndStatus(Long clubId, Long bookId, Status status);
 
     List<BookExemptionRequest> findAllByClubIdAndStatusOrderByCreatedAtAsc(Long clubId, Status status);
+
+    /** 관리자 URL 해제에서 이미 exempt 인 책의 최신 APPROVED 이력 조회 (idempotent 응답용). */
+    Optional<BookExemptionRequest> findTopByClubIdAndBookIdAndStatusOrderByCreatedAtDesc(
+        Long clubId, Long bookId, Status status);
 }

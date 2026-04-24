@@ -51,6 +51,14 @@ public class BookExemptionRequest {
     @Column(nullable = false, columnDefinition = "VARCHAR(20)")
     private Status status;
 
+    /**
+     * 신청 출처. {@link SourceType#USER_REQUEST} 는 회원이 직접 낸 PENDING,
+     * {@link SourceType#ADMIN_PROACTIVE} 는 관리자가 알라딘 URL 로 즉시 해제하며 생성한 APPROVED 이력.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "source_type", nullable = false, columnDefinition = "VARCHAR(30) DEFAULT 'USER_REQUEST'")
+    private SourceType sourceType;
+
     @Column(name = "processed_by_member_id")
     private Long processedByMemberId;
 
@@ -68,6 +76,21 @@ public class BookExemptionRequest {
         r.memberId = memberId;
         r.reason = reason;
         r.status = Status.PENDING;
+        r.sourceType = SourceType.USER_REQUEST;
+        return r;
+    }
+
+    /** 관리자가 알라딘 URL 로 바로 해제할 때 사용. APPROVED 상태로 감사 이력을 남긴다. */
+    public static BookExemptionRequest ofAdminProactive(Long clubId, Long bookId, Long adminMemberId, String reason) {
+        BookExemptionRequest r = new BookExemptionRequest();
+        r.clubId = clubId;
+        r.bookId = bookId;
+        r.memberId = adminMemberId;
+        r.reason = reason;
+        r.status = Status.APPROVED;
+        r.sourceType = SourceType.ADMIN_PROACTIVE;
+        r.processedByMemberId = adminMemberId;
+        r.processedAt = LocalDateTime.now();
         return r;
     }
 
@@ -94,4 +117,6 @@ public class BookExemptionRequest {
     }
 
     public enum Status { PENDING, APPROVED, REJECTED }
+
+    public enum SourceType { USER_REQUEST, ADMIN_PROACTIVE }
 }
