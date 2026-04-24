@@ -1,6 +1,7 @@
 package com.example.demo.club.repository;
 
 import com.example.demo.club.domain.ClubMember;
+import com.example.demo.club.domain.ClubMember.MembershipStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -9,6 +10,7 @@ import java.util.Optional;
 public interface ClubMemberRepository extends JpaRepository<ClubMember, Long> {
     List<ClubMember> findAllByMemberId(Long memberId);
     List<ClubMember> findAllByClubId(Long clubId);
+    List<ClubMember> findAllByClubIdAndStatus(Long clubId, MembershipStatus status);
     Optional<ClubMember> findByClubIdAndMemberId(Long clubId, Long memberId);
     boolean existsByClubIdAndMemberId(Long clubId, Long memberId);
 }

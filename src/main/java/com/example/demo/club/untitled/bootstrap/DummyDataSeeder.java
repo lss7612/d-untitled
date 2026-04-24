@@ -1,6 +1,8 @@
 package com.example.demo.club.untitled.bootstrap;
 
 import com.example.demo.club.domain.Club;
+import com.example.demo.club.domain.ClubMember;
+import com.example.demo.club.repository.ClubMemberRepository;
 import com.example.demo.club.repository.ClubRepository;
 import com.example.demo.club.service.ClubMembershipService;
 import com.example.demo.club.untitled.domain.BookCategory;
@@ -10,6 +12,7 @@ import com.example.demo.club.untitled.domain.BookRequestStatus;
 import com.example.demo.club.untitled.domain.OrderItem;
 import com.example.demo.club.untitled.external.AladinApiClient;
 import com.example.demo.club.untitled.external.ParsedBook;
+import com.example.demo.club.untitled.budget.service.MemberBudgetService;
 import com.example.demo.club.untitled.repository.BookReportRepository;
 import com.example.demo.club.untitled.repository.BookRequestRepository;
 import com.example.demo.club.untitled.repository.OrderItemRepository;
@@ -51,12 +54,14 @@ public class DummyDataSeeder implements CommandLineRunner {
     private final MemberRepository memberRepository;
     private final ClubRepository clubRepository;
     private final ClubMembershipService clubMembershipService;
+    private final ClubMemberRepository clubMemberRepository;
     private final BookRequestRepository bookRequestRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final BookReportRepository bookReportRepository;
     private final AladinApiClient aladinApiClient;
     private final ExchangeRateProvider exchangeRateProvider;
+    private final MemberBudgetService memberBudgetService;
     private final TransactionTemplate transactionTemplate;
 
     private static final String[][] DUMMY_MEMBERS = {
@@ -154,7 +159,18 @@ public class DummyDataSeeder implements CommandLineRunner {
             Member member = Member.create(email, name, null);
             member.verifyEmail();
             Member saved = memberRepository.save(member);
-            clubMembershipService.autoEnroll(saved);
+            clubMembershipService.onAuthenticated(saved);
+            // 더미 회원은 테스트 용도로 무제에 바로 ACTIVE 가입 (가입 신청 플로우 건너뜀)
+            Club muje = clubRepository.findByName(ClubMembershipService.DEFAULT_CLUB_NAME).orElse(null);
+            if (muje != null && clubMemberRepository.findByClubIdAndMemberId(muje.getId(), saved.getId()).isEmpty()) {
+                clubMemberRepository.save(ClubMember.of(
+                    muje.getId(), saved.getId(),
+                    ClubMember.ClubRole.MEMBER,
+                    ClubMember.MembershipStatus.ACTIVE
+                ));
+                // 가입 시점 예산 스냅샷 생성 (가입 시 스냅샷 생성 규약과 일치)
+                memberBudgetService.getOrCreate(muje.getId(), saved, YearMonth.now());
+            }
             created.add(saved);
             log.info("[DummySeeder] 회원 생성: {} ({})", name, email);
         }
@@ -210,8 +226,7 @@ public class DummyDataSeeder implements CommandLineRunner {
     }
 
     private BookRequestStatus statusFor(int index) {
-        if (index < 5) return BookRequestStatus.PENDING;
-        if (index < 10) return BookRequestStatus.LOCKED;
+        if (index < 10) return BookRequestStatus.PENDING;
         if (index < 18) return BookRequestStatus.ORDERED;
         if (index < 22) return BookRequestStatus.ARRIVED;
         return BookRequestStatus.RECEIVED;
@@ -220,23 +235,16 @@ public class DummyDataSeeder implements CommandLineRunner {
     private void applyStatus(BookRequest br, BookRequestStatus status) {
         switch (status) {
             case PENDING -> { /* default */ }
-            case LOCKED -> br.changeStatus(BookRequestStatus.LOCKED);
-            case ORDERED -> {
-                br.changeStatus(BookRequestStatus.LOCKED);
-                br.changeStatus(BookRequestStatus.ORDERED);
-            }
+            case ORDERED -> br.changeStatus(BookRequestStatus.ORDERED);
             case ARRIVED -> {
-                br.changeStatus(BookRequestStatus.LOCKED);
                 br.changeStatus(BookRequestStatus.ORDERED);
                 br.markArrived();
             }
             case RECEIVED -> {
-                br.changeStatus(BookRequestStatus.LOCKED);
                 br.changeStatus(BookRequestStatus.ORDERED);
                 br.markArrived();
                 br.markReceived();
             }
-            default -> { /* SHIPPING 등 unused */ }
         }
     }
 

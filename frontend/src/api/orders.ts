@@ -61,8 +61,8 @@ export const markOrdered = (clubId: number, ids: number[]) =>
     body: JSON.stringify({ ids }),
   })
 
-export const markLocked = (clubId: number, ids: number[]) =>
-  apiFetch<OrderResponse | null>(`/api/v1/admin/clubs/${clubId}/book-requests/mark-locked`, {
+export const unmarkOrdered = (clubId: number, ids: number[]) =>
+  apiFetch<OrderResponse | null>(`/api/v1/admin/clubs/${clubId}/book-requests/unmark-ordered`, {
     method: 'PATCH',
     body: JSON.stringify({ ids }),
   })
@@ -82,3 +82,21 @@ export const markUnarrived = (clubId: number, ids: number[]) =>
     method: 'PATCH',
     body: JSON.stringify({ ids }),
   })
+
+export interface UnsubmittedMember {
+  memberId: number
+  name: string
+  email: string
+}
+
+export interface UnsubmittedMembersResponse {
+  targetMonth: string
+  totalActiveMembers: number
+  submittedCount: number
+  unsubmitted: UnsubmittedMember[]
+}
+
+export const fetchUnsubmittedMembers = (clubId: number, yearMonth?: string) => {
+  const qs = yearMonth ? `?yearMonth=${yearMonth}` : ''
+  return apiFetch<UnsubmittedMembersResponse>(`/api/v1/admin/clubs/${clubId}/book-requests/unsubmitted${qs}`)
+}

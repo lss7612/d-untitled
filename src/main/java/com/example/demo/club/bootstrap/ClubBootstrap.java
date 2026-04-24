@@ -43,9 +43,11 @@ public class ClubBootstrap implements CommandLineRunner {
 
         seedSchedulesIfMissing(muje.getId());
 
+        // 기존 인증 완료 회원의 역할/DEVELOPER 자동 가입만 재확인. 일반 회원의 무제 가입은
+        // 본인이 명시적으로 신청해야 한다. (자동 가입 로직 제거됨)
         memberRepository.findAll().stream()
             .filter(Member::isEmailVerified)
-            .forEach(membershipService::autoEnroll);
+            .forEach(membershipService::onAuthenticated);
     }
 
     private void seedSchedulesIfMissing(Long clubId) {

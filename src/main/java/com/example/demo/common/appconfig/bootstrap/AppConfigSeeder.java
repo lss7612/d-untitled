@@ -30,12 +30,12 @@ public class AppConfigSeeder implements CommandLineRunner {
 
     private void seedWhiteList() {
         if (appConfigRepository.findByType(ConfigType.WHITE_LIST).isPresent()) return;
-        appConfigRepository.save(AppConfig.of(ConfigType.WHITE_LIST, "[\"dhtnrud000@gmail.com\"]", null));
+        appConfigRepository.save(AppConfig.of(ConfigType.WHITE_LIST, "[\"lss7612@gmail.com\"]", null));
         log.info("[AppConfigSeeder] WHITE_LIST 초기 시드 완료");
     }
 
     private void seedSsuMember() {
-        String email = "dhtnrud000@gmail.com";
+        String email = "lss7612@gmail.com";
         if (memberRepository.findByEmail(email).isPresent()) return;
         Member ssu = Member.create(email, "쑤", null);
         ssu.verifyEmail();

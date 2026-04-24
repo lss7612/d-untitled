@@ -1,15 +1,28 @@
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
+import { Check, X } from 'lucide-react'
 import AppHeader from '@/components/AppHeader'
 import { DotPattern } from '@/components/ui/dot-pattern'
 import { useMe } from '@/hooks/useMe'
-import { useClubSchedules, useMyClubs } from '@/hooks/useClubs'
+import {
+  useClubSchedules,
+  useMyClubs,
+  usePendingJoinRequests,
+  useApproveJoinRequest,
+  useRejectJoinRequest,
+} from '@/hooks/useClubs'
+import {
+  useIncomingShares,
+  useAcceptShare,
+  useRejectShare,
+} from '@/hooks/useBudgetShares'
 import { currentYearMonth, formatKoreanDate, dDay, scheduleLabel } from '@/lib/date'
 
 const MUJE_CLUB_ID = 1
 
 const MENU_ITEMS = [
   { emoji: '📚', label: '책 신청', path: '/muje/book-requests' },
+  { emoji: '📖', label: '보유 책 검색', path: '/muje/books' },
   { emoji: '✍️', label: '독후감 제출', path: '/muje/book-reports' },
   { emoji: '👤', label: '내 정보', path: null },
 ]
@@ -23,6 +36,31 @@ export default function MujePage() {
   )
   const { data: myClubs } = useMyClubs()
   const isAdmin = myClubs?.some((c) => c.id === MUJE_CLUB_ID && c.myRole === 'ADMIN') ?? false
+  const isDeveloper = me?.role === 'DEVELOPER'
+  const canManageJoins = isAdmin || isDeveloper
+
+  const { data: joinRequests } = usePendingJoinRequests(MUJE_CLUB_ID, canManageJoins)
+  const approveMutation = useApproveJoinRequest(MUJE_CLUB_ID)
+  const rejectMutation = useRejectJoinRequest(MUJE_CLUB_ID)
+
+  // 내게 온 나눔 신청 (수락 대기)
+  const currentYm = currentYearMonth()
+  const { data: incomingShares = [] } = useIncomingShares(MUJE_CLUB_ID, currentYm)
+  const acceptShareMut = useAcceptShare(MUJE_CLUB_ID)
+  const rejectShareMut = useRejectShare(MUJE_CLUB_ID)
+
+  function handleApprove(memberId: number, name: string | null) {
+    approveMutation.mutate(memberId, {
+      onSuccess: () => toast.success(`${name ?? '회원'} 가입 승인 완료`),
+      onError: (e: Error) => toast.error(e.message || '승인 실패'),
+    })
+  }
+  function handleReject(memberId: number, name: string | null) {
+    rejectMutation.mutate(memberId, {
+      onSuccess: () => toast.success(`${name ?? '회원'} 가입 거절`),
+      onError: (e: Error) => toast.error(e.message || '거절 실패'),
+    })
+  }
 
   function handleMenu(path: string | null) {
     if (path) navigate(path)
@@ -102,6 +140,97 @@ export default function MujePage() {
             </section>
           )}
 
+          {incomingShares.length > 0 && (
+            <section className="mt-6">
+              <h3 className="text-sm font-medium text-sky-400 uppercase tracking-wider mb-3">
+                나눔 신청 ({incomingShares.length})
+              </h3>
+              <ul className="space-y-2">
+                {incomingShares.map((s) => (
+                  <li
+                    key={s.id}
+                    className="flex items-center justify-between rounded-xl border border-sky-900/40 bg-sky-950/15 px-4 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm text-zinc-200">
+                        <span className="font-medium">{s.requesterName ?? '(이름 없음)'}</span>
+                        {'님이 '}
+                        <span className="text-sky-300">{s.amount.toLocaleString()}원</span>
+                        {' 나눔을 신청했습니다.'}
+                      </p>
+                      {s.note && (
+                        <p className="text-xs text-zinc-500 mt-0.5 truncate">{s.note}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() =>
+                          acceptShareMut.mutate(s.id, {
+                            onSuccess: () => toast.success('수락 완료'),
+                            onError: (e: Error) => toast.error(e.message),
+                          })
+                        }
+                        disabled={acceptShareMut.isPending || rejectShareMut.isPending}
+                        className="flex items-center gap-1 rounded-lg bg-sky-700 hover:bg-sky-600 px-3 py-1.5 text-xs font-medium text-white transition-colors disabled:opacity-50"
+                      >
+                        <Check size={12} /> 수락
+                      </button>
+                      <button
+                        onClick={() =>
+                          rejectShareMut.mutate(s.id, {
+                            onSuccess: () => toast.success('거절 완료'),
+                            onError: (e: Error) => toast.error(e.message),
+                          })
+                        }
+                        disabled={acceptShareMut.isPending || rejectShareMut.isPending}
+                        className="flex items-center gap-1 rounded-lg bg-zinc-700 hover:bg-zinc-600 px-3 py-1.5 text-xs font-medium text-zinc-200 transition-colors disabled:opacity-50"
+                      >
+                        <X size={12} /> 거절
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {canManageJoins && joinRequests && joinRequests.length > 0 && (
+            <section className="mt-6">
+              <h3 className="text-sm font-medium text-amber-400 uppercase tracking-wider mb-3">
+                가입 신청 ({joinRequests.length})
+              </h3>
+              <ul className="space-y-2">
+                {joinRequests.map((req) => (
+                  <li
+                    key={req.memberId}
+                    className="flex items-center justify-between rounded-xl border border-amber-900/40 bg-amber-950/10 px-4 py-3"
+                  >
+                    <div>
+                      <p className="text-sm text-zinc-200">{req.memberName ?? '(이름 없음)'}</p>
+                      <p className="text-xs text-zinc-500 mt-0.5">{req.memberEmail}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleApprove(req.memberId, req.memberName)}
+                        disabled={approveMutation.isPending || rejectMutation.isPending}
+                        className="flex items-center gap-1 rounded-lg bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors disabled:opacity-50"
+                      >
+                        <Check size={12} /> 승인
+                      </button>
+                      <button
+                        onClick={() => handleReject(req.memberId, req.memberName)}
+                        disabled={approveMutation.isPending || rejectMutation.isPending}
+                        className="flex items-center gap-1 rounded-lg bg-zinc-700 hover:bg-zinc-600 px-3 py-1.5 text-xs font-medium text-zinc-200 transition-colors disabled:opacity-50"
+                      >
+                        <X size={12} /> 거절
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {isAdmin && (
             <section className="mt-6">
               <h3 className="text-sm font-medium text-amber-400 uppercase tracking-wider mb-3">관리자</h3>
@@ -134,6 +263,36 @@ export default function MujePage() {
                   <div>
                     <p className="text-sm text-zinc-200">도착 / 수령 관리</p>
                     <p className="text-xs text-zinc-500 mt-0.5">도착한 책 처리 + 미수령자 확인</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => navigate('/muje/admin/members')}
+                  className="rounded-xl border border-amber-900/40 bg-amber-950/20 p-5 flex items-center gap-3 hover:bg-amber-950/30 transition-colors cursor-pointer text-left"
+                >
+                  <span className="text-2xl">🛡️</span>
+                  <div>
+                    <p className="text-sm text-zinc-200">멤버 관리</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">관리자 지정 / 해제</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => navigate('/muje/admin/book-exemptions')}
+                  className="rounded-xl border border-amber-900/40 bg-amber-950/20 p-5 flex items-center gap-3 hover:bg-amber-950/30 transition-colors cursor-pointer text-left"
+                >
+                  <span className="text-2xl">🔓</span>
+                  <div>
+                    <p className="text-sm text-zinc-200">제한풀기 신청</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">중복 책 신청 허용 요청 승인 / 거절</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => navigate('/muje/admin/exempt-books')}
+                  className="rounded-xl border border-amber-900/40 bg-amber-950/20 p-5 flex items-center gap-3 hover:bg-amber-950/30 transition-colors cursor-pointer text-left"
+                >
+                  <span className="text-2xl">🔁</span>
+                  <div>
+                    <p className="text-sm text-zinc-200">제한 재적용</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">제한풀기 승인된 책 되돌리기</p>
                   </div>
                 </button>
               </div>

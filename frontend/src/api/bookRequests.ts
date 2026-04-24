@@ -1,4 +1,5 @@
 import { apiFetch } from './client'
+import type { BudgetShareResponse } from './budgetShares'
 
 export const BOOK_CATEGORIES = [
   { code: 'LITERATURE', label: '문학' },
@@ -53,11 +54,21 @@ export interface BookRequestResponse {
 
 export interface MyBookRequestsResponse {
   targetMonth: string
+  /** 정책 기반 기본 한도. */
   budgetLimit: number
+  /** 이번 달 ACCEPTED 로 받은 나눔 총액. */
+  transferIn: number
+  /** 이번 달 ACCEPTED 로 전달한 나눔 총액. */
+  transferOut: number
+  /** budgetLimit + transferIn - transferOut. */
+  effectiveLimit: number
   budgetUsed: number
+  /** effectiveLimit - budgetUsed. */
   budgetRemaining: number
   locked: boolean
   requests: BookRequestResponse[]
+  /** 배너에 "○○님에게 받은 N원" 뱃지를 렌더할 ACCEPTED 레코드. */
+  acceptedShares: BudgetShareResponse[]
 }
 
 export const parseBookUrl = (clubId: number, url: string) =>
@@ -82,7 +93,7 @@ export const deleteBookRequest = (clubId: number, id: number) =>
 
 export interface LockResult {
   yearMonth: string
-  affected: number
+  locked: boolean
 }
 
 export const lockBookRequests = (clubId: number, yearMonth?: string) => {
