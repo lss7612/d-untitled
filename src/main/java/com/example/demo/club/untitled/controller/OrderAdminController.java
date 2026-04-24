@@ -3,6 +3,8 @@ package com.example.demo.club.untitled.controller;
 import com.example.demo.club.untitled.dto.AdminBookRequestRow;
 import com.example.demo.club.untitled.dto.MarkRequest;
 import com.example.demo.club.untitled.dto.OrderResponse;
+import com.example.demo.club.untitled.dto.UnsubmittedMembersResponse;
+import com.example.demo.club.untitled.service.BookRequestService;
 import com.example.demo.club.untitled.service.OrderService;
 import com.example.demo.common.response.ApiResponse;
 import com.example.demo.user.domain.Member;
@@ -19,6 +21,7 @@ import java.util.List;
 public class OrderAdminController {
 
     private final OrderService orderService;
+    private final BookRequestService bookRequestService;
 
     @GetMapping("/book-requests/all")
     public ApiResponse<List<AdminBookRequestRow>> listAll(
@@ -38,7 +41,7 @@ public class OrderAdminController {
         return ApiResponse.ok(orderService.findOrder(clubId, member.getId(), parse(yearMonth)).orElse(null));
     }
 
-    /** 선택한 신청들을 LOCKED → ORDERED로 전환. Order/OrderItem 자동 누적. */
+    /** 선택한 신청들을 PENDING → ORDERED로 전환. 잠금 상태 필수. Order/OrderItem 자동 누적. */
     @PatchMapping("/book-requests/mark-ordered")
     public ApiResponse<OrderResponse> markOrdered(
         @PathVariable Long clubId,
@@ -48,14 +51,26 @@ public class OrderAdminController {
         return ApiResponse.ok(orderService.markOrdered(clubId, member.getId(), req.ids()));
     }
 
-    /** 선택한 신청들을 ORDERED → LOCKED로 되돌림. */
-    @PatchMapping("/book-requests/mark-locked")
-    public ApiResponse<OrderResponse> markLocked(
+    /** 선택한 신청들을 ORDERED → PENDING으로 되돌림 (주문 처리 취소). */
+    @PatchMapping("/book-requests/unmark-ordered")
+    public ApiResponse<OrderResponse> unmarkOrdered(
         @PathVariable Long clubId,
         @RequestBody MarkRequest req,
         @AuthenticationPrincipal Member member
     ) {
-        return ApiResponse.ok(orderService.markLocked(clubId, member.getId(), req.ids()).orElse(null));
+        return ApiResponse.ok(orderService.unmarkOrdered(clubId, member.getId(), req.ids()).orElse(null));
+    }
+
+    /** 해당 월에 책 신청이 0건인 ACTIVE 멤버 목록 (관리자 전용). */
+    @GetMapping("/book-requests/unsubmitted")
+    public ApiResponse<UnsubmittedMembersResponse> unsubmitted(
+        @PathVariable Long clubId,
+        @RequestParam(required = false) String yearMonth,
+        @AuthenticationPrincipal Member member
+    ) {
+        return ApiResponse.ok(
+            bookRequestService.findUnsubmittedForAdmin(clubId, member.getId(), parse(yearMonth), member)
+        );
     }
 
     private YearMonth parse(String yearMonth) {

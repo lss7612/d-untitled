@@ -30,7 +30,7 @@ public class Order {
     private String targetMonth;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, columnDefinition = "VARCHAR(30)")
     private OrderStatus status;
 
     @Column(name = "total_amount", nullable = false)

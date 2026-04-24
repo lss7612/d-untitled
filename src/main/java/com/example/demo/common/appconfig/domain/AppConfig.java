@@ -19,7 +19,7 @@ public class AppConfig {
     private Long id;
 
     @Enumerated(EnumType.STRING)
-    @Column(unique = true, nullable = false, length = 50)
+    @Column(unique = true, nullable = false, columnDefinition = "VARCHAR(50)")
     private ConfigType type;
 
     @Column(columnDefinition = "TEXT", nullable = false)

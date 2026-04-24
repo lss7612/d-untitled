@@ -35,6 +35,7 @@ public class OrderService {
     private final BookRequestRepository bookRequestRepository;
     private final MemberRepository memberRepository;
     private final ClubService clubService;
+    private final MonthLockService monthLockService;
 
     public List<AdminBookRequestRow> findAllRequests(Long clubId, Long adminMemberId, YearMonth targetMonth) {
         clubService.requireAdmin(clubId, adminMemberId);
@@ -55,8 +56,11 @@ public class OrderService {
     }
 
     /**
-     * 선택한 BookRequest들을 LOCKED → ORDERED로 전환.
+     * 선택한 BookRequest들을 PENDING → ORDERED로 전환.
      * Order가 없으면 자동 생성. ISBN별로 OrderItem 누적.
+     *
+     * <p>가드: 해당 월이 {@link com.example.demo.club.untitled.domain.MonthLock}
+     * 으로 잠겨 있지 않으면 400 — 주문 처리 중 회원이 추가 신청하는 사고 방지.
      */
     @Transactional
     public OrderResponse markOrdered(Long clubId, Long adminMemberId, List<Long> ids) {
@@ -70,19 +74,24 @@ public class OrderService {
             throw new BusinessException("일부 신청을 찾을 수 없습니다.", 404);
         }
 
-        // 검증: 같은 동호회 + 같은 월 + 모두 LOCKED
+        // 검증: 같은 동호회 + 같은 월 + 모두 PENDING
         String targetMonth = null;
         for (BookRequest br : targets) {
             if (!br.getClubId().equals(clubId)) {
                 throw new BusinessException("다른 동호회의 신청이 포함되었습니다.", 400);
             }
-            if (br.getStatus() != BookRequestStatus.LOCKED) {
-                throw new BusinessException("LOCKED 상태가 아닌 신청이 포함되었습니다: " + br.getStatus().getLabel(), 400);
+            if (br.getStatus() != BookRequestStatus.PENDING) {
+                throw new BusinessException("신청 대기(PENDING) 상태가 아닌 신청이 포함되었습니다: " + br.getStatus().getLabel(), 400);
             }
             if (targetMonth == null) targetMonth = br.getTargetMonth();
             else if (!targetMonth.equals(br.getTargetMonth())) {
                 throw new BusinessException("서로 다른 월의 신청이 섞여 있습니다.", 400);
             }
+        }
+
+        // 잠금 가드: 잠긴 상태일 때만 주문 처리 허용.
+        if (!monthLockService.isLocked(clubId, YearMonth.parse(targetMonth))) {
+            throw new BusinessException("먼저 이번 달 신청을 잠가주세요.", 400);
         }
 
         // Order 가져오거나 생성
@@ -113,11 +122,12 @@ public class OrderService {
     }
 
     /**
-     * 선택한 BookRequest들을 ORDERED → LOCKED로 되돌림.
+     * 선택한 BookRequest들을 ORDERED → PENDING으로 되돌림 (주문 처리 취소).
      * OrderItem quantity 감소 / 0 되면 삭제. Order의 items 모두 사라지면 Order delete.
+     * 잠금 상태 여부와 무관하게 되돌리기는 가능.
      */
     @Transactional
-    public Optional<OrderResponse> markLocked(Long clubId, Long adminMemberId, List<Long> ids) {
+    public Optional<OrderResponse> unmarkOrdered(Long clubId, Long adminMemberId, List<Long> ids) {
         clubService.requireAdmin(clubId, adminMemberId);
         if (ids == null || ids.isEmpty()) {
             throw new BusinessException("선택한 책이 없습니다.", 400);
@@ -159,7 +169,7 @@ public class OrderService {
             if (item.getQuantity() <= 0) {
                 orderItemRepository.delete(item);
             }
-            br.revertToLocked();
+            br.revertToPending();
         }
 
         // 누적 항목 재조회 후 합계 갱신, 비어있으면 Order 삭제

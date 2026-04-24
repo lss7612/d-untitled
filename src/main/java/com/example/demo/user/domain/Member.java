@@ -33,7 +33,7 @@ public class Member {
     private boolean emailVerified;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "VARCHAR(50)")
     private Role role;
 
     @CreatedDate
@@ -67,6 +67,6 @@ public class Member {
     }
 
     public enum Role {
-        MEMBER, ADMIN, DEVELOPER
+        MEMBER, DEVELOPER
     }
 }

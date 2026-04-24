@@ -66,7 +66,7 @@ public class BookRequest {
     private BigDecimal exchangeRate;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
+    @Column(nullable = false, columnDefinition = "VARCHAR(30)")
     private BookCategory category;
 
     @Column(name = "source_url", nullable = false, length = 500)
@@ -84,7 +84,7 @@ public class BookRequest {
     private Long orderId;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, columnDefinition = "VARCHAR(30)")
     private BookRequestStatus status;
 
     @Column(name = "target_month", nullable = false, length = 7)
@@ -132,14 +132,16 @@ public class BookRequest {
         return br;
     }
 
+    /** PENDING → ORDERED. 합산 주문서에 편입됨. */
     public void assignToOrder(Long orderId) {
         this.orderId = orderId;
         this.status = BookRequestStatus.ORDERED;
     }
 
-    public void revertToLocked() {
+    /** ORDERED → PENDING. 주문 처리 취소 시 사용. */
+    public void revertToPending() {
         this.orderId = null;
-        this.status = BookRequestStatus.LOCKED;
+        this.status = BookRequestStatus.PENDING;
     }
 
     public void markArrived() {

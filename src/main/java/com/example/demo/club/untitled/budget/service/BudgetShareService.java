@@ -36,9 +36,7 @@ public class BudgetShareService {
 
     /** 나눔 이체가 동결되는 BookRequest 상태들 (멤버 단위로 하나라도 있으면 lock). */
     private static final List<BookRequestStatus> LOCKED_STATUSES = List.of(
-        BookRequestStatus.LOCKED,
         BookRequestStatus.ORDERED,
-        BookRequestStatus.SHIPPING,
         BookRequestStatus.ARRIVED,
         BookRequestStatus.RECEIVED
     );

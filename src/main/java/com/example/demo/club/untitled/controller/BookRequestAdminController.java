@@ -24,8 +24,8 @@ public class BookRequestAdminController {
         @AuthenticationPrincipal Member member
     ) {
         YearMonth ym = parse(yearMonth);
-        int count = bookRequestService.lock(clubId, member.getId(), ym);
-        return ApiResponse.ok(new LockResult(ym.toString(), count));
+        boolean locked = bookRequestService.lock(clubId, member.getId(), ym, member);
+        return ApiResponse.ok(new LockResult(ym.toString(), locked));
     }
 
     @PostMapping("/unlock")
@@ -35,8 +35,8 @@ public class BookRequestAdminController {
         @AuthenticationPrincipal Member member
     ) {
         YearMonth ym = parse(yearMonth);
-        int count = bookRequestService.unlock(clubId, member.getId(), ym);
-        return ApiResponse.ok(new LockResult(ym.toString(), count));
+        boolean locked = bookRequestService.unlock(clubId, member.getId(), ym, member);
+        return ApiResponse.ok(new LockResult(ym.toString(), locked));
     }
 
     @PatchMapping("/mark-arrived")
@@ -63,6 +63,6 @@ public class BookRequestAdminController {
         return (yearMonth == null || yearMonth.isBlank()) ? YearMonth.now() : YearMonth.parse(yearMonth);
     }
 
-    public record LockResult(String yearMonth, int affected) {}
+    public record LockResult(String yearMonth, boolean locked) {}
     public record MarkResult(int affected) {}
 }

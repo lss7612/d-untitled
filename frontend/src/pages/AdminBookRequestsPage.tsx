@@ -8,9 +8,11 @@ import {
   useAdminBookRequests,
   useOrder,
   useMarkOrdered,
-  useMarkLocked,
+  useUnmarkOrdered,
+  useUnsubmittedMembers,
 } from '@/hooks/useOrders'
 import { useMyBookRequests, useLockBookRequests, useUnlockBookRequests } from '@/hooks/useBookRequests'
+import { useBudgetSummary } from '@/hooks/useBudgets'
 import type { AdminBookRequestRow } from '@/api/orders'
 
 const MUJE_CLUB_ID = 1
@@ -45,10 +47,12 @@ export default function AdminBookRequestsPage() {
   const { data: rows, isLoading } = useAdminBookRequests(MUJE_CLUB_ID)
   const { data: myMonth } = useMyBookRequests(MUJE_CLUB_ID)
   const { data: order } = useOrder(MUJE_CLUB_ID)
+  const { data: budgetSummary } = useBudgetSummary(MUJE_CLUB_ID)
+  const { data: unsubmittedData } = useUnsubmittedMembers(MUJE_CLUB_ID)
   const lockMut = useLockBookRequests(MUJE_CLUB_ID)
   const unlockMut = useUnlockBookRequests(MUJE_CLUB_ID)
   const markOrderedMut = useMarkOrdered(MUJE_CLUB_ID)
-  const markLockedMut = useMarkLocked(MUJE_CLUB_ID)
+  const unmarkOrderedMut = useUnmarkOrdered(MUJE_CLUB_ID)
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
 
@@ -85,37 +89,37 @@ export default function AdminBookRequestsPage() {
   const selectedAmount = selectedRows.reduce((s, r) => s + r.price, 0)
 
   // 상태별 분류
-  const lockedSelected = selectedRows.filter((r) => r.status === 'LOCKED')
+  const pendingSelected = selectedRows.filter((r) => r.status === 'PENDING')
   const orderedSelected = selectedRows.filter((r) => r.status === 'ORDERED')
-  const allSelectedAreLocked = selectedRows.length > 0 && lockedSelected.length === selectedRows.length
+  const allSelectedArePending = selectedRows.length > 0 && pendingSelected.length === selectedRows.length
   const allSelectedAreOrdered = selectedRows.length > 0 && orderedSelected.length === selectedRows.length
 
-  // 카트 스크립트는 LOCKED + K-CODE 있는 것만
-  const cartTargets = lockedSelected.filter((r) => !!r.aladinItemCode)
+  // 카트 스크립트는 PENDING + K-CODE 있는 것만
+  const cartTargets = pendingSelected.filter((r) => !!r.aladinItemCode)
   const cartTargetKCodes = cartTargets.map((r) => r.aladinItemCode as string)
-  const missingCodeCount = lockedSelected.length - cartTargets.length
+  const missingCodeCount = pendingSelected.length - cartTargets.length
 
   const locked = myMonth?.locked ?? false
 
   function handleLock() {
-    if (!confirm('이번 달 신청을 잠그시겠습니까? PENDING → LOCKED.')) return
+    if (!confirm('이번 달 신청을 잠그시겠습니까? 회원이 추가 신청할 수 없게 됩니다.')) return
     lockMut.mutate(undefined, {
-      onSuccess: (r) => toast.success(`잠금 완료 (${r.affected}건)`),
+      onSuccess: () => toast.success('잠금 완료'),
       onError: (e) => toast.error(e.message),
     })
   }
 
   function handleUnlock() {
-    if (!confirm('잠금을 해제하시겠습니까?\n* LOCKED 책만 PENDING으로 되돌아가며, ORDERED 책은 변경되지 않습니다.')) return
+    if (!confirm('잠금을 해제하시겠습니까? 회원이 다시 추가 신청할 수 있게 됩니다. 이미 주문 처리된 책에는 영향 없습니다.')) return
     unlockMut.mutate(undefined, {
-      onSuccess: (r) => toast.success(`해제 완료 (${r.affected}건)`),
+      onSuccess: () => toast.success('해제 완료'),
       onError: (e) => toast.error(e.message),
     })
   }
 
   async function handleCopyScript() {
     if (cartTargetKCodes.length === 0) {
-      toast.warning('카트에 담을 책이 없습니다 (LOCKED + K-CODE 필요).')
+      toast.warning('카트에 담을 책이 없습니다 (신청 대기 + K-CODE 필요).')
       return
     }
     const script = buildAutomationScript(cartTargetKCodes)
@@ -132,13 +136,13 @@ export default function AdminBookRequestsPage() {
   }
 
   function handleMarkOrdered() {
-    if (lockedSelected.length === 0) return
-    if (!confirm(`선택한 ${lockedSelected.length}권을 신청완료로 처리하시겠습니까?`)) return
+    if (pendingSelected.length === 0) return
+    if (!confirm(`선택한 ${pendingSelected.length}권을 신청완료로 처리하시겠습니까?`)) return
     markOrderedMut.mutate(
-      lockedSelected.map((r) => r.id),
+      pendingSelected.map((r) => r.id),
       {
         onSuccess: (o) => {
-          toast.success(`신청완료 처리 (${lockedSelected.length}권). 누적: ${o.totalQuantity}권`)
+          toast.success(`신청완료 처리 (${pendingSelected.length}권). 누적: ${o.totalQuantity}권`)
           setSelectedIds(new Set())
         },
         onError: (e) => toast.error(e.message),
@@ -146,14 +150,14 @@ export default function AdminBookRequestsPage() {
     )
   }
 
-  function handleMarkLocked() {
+  function handleUnmarkOrdered() {
     if (orderedSelected.length === 0) return
     if (!confirm(
       `⚠ 신청완료를 취소하시겠습니까?\n\n` +
       `이미 알라딘에서 결제했다면 취소하지 마세요.\n` +
-      `선택한 ${orderedSelected.length}권이 LOCKED 상태로 되돌아갑니다.`
+      `선택한 ${orderedSelected.length}권이 신청 대기(PENDING) 상태로 되돌아갑니다.`
     )) return
-    markLockedMut.mutate(
+    unmarkOrderedMut.mutate(
       orderedSelected.map((r) => r.id),
       {
         onSuccess: () => {
@@ -196,6 +200,47 @@ export default function AdminBookRequestsPage() {
             <Button onClick={handleLock} disabled={lockMut.isPending}>
               {lockMut.isPending ? '잠그는 중...' : '신청 마감 잠금'}
             </Button>
+          )}
+        </section>
+
+        {/* 예산 사용 현황 */}
+        <section className="mb-6 rounded-xl border border-amber-900/40 bg-amber-950/20 p-5">
+          <p className="text-sm font-medium text-amber-200 mb-3">예산 사용 현황</p>
+          {!budgetSummary ? (
+            <p className="text-xs text-zinc-500">불러오는 중...</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="rounded-lg bg-zinc-950/60 p-3">
+                <p className="text-xs text-amber-400/80">신청된 예산</p>
+                <p className="text-lg font-semibold text-zinc-100">
+                  ₩{budgetSummary.totalRequestedAmount.toLocaleString()}
+                </p>
+              </div>
+              <div className="rounded-lg bg-zinc-950/60 p-3">
+                <p className="text-xs text-amber-400/80">전체 예산</p>
+                <p className="text-lg font-semibold text-zinc-100">
+                  ₩{budgetSummary.totalBaseLimit.toLocaleString()}
+                </p>
+              </div>
+              <div className="rounded-lg bg-zinc-950/60 p-3">
+                <p className="text-xs text-amber-400/80">사용률</p>
+                <p
+                  className={`text-lg font-semibold ${
+                    budgetSummary.usagePercent >= 80 ? 'text-orange-400' : 'text-amber-300'
+                  }`}
+                >
+                  {budgetSummary.usagePercent.toFixed(1)}%
+                </p>
+                <div className="mt-2 h-1.5 w-full bg-zinc-800/60 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      budgetSummary.usagePercent >= 80 ? 'bg-orange-500' : 'bg-amber-400'
+                    }`}
+                    style={{ width: `${Math.min(100, budgetSummary.usagePercent)}%` }}
+                  />
+                </div>
+              </div>
+            </div>
           )}
         </section>
 
@@ -245,7 +290,7 @@ export default function AdminBookRequestsPage() {
               <p className="text-sm font-medium text-zinc-200">카트 담기 / 신청완료 처리</p>
               <p className="text-xs text-zinc-500 mt-1">
                 선택: {selectedQty}권 · ₩{selectedAmount.toLocaleString()}
-                {missingCodeCount > 0 && allSelectedAreLocked && (
+                {missingCodeCount > 0 && allSelectedArePending && (
                   <span className="ml-2 text-amber-400">
                     (K-CODE 없는 {missingCodeCount}권 카트 제외)
                   </span>
@@ -266,23 +311,23 @@ export default function AdminBookRequestsPage() {
                 </Button>
                 <Button
                   onClick={handleMarkOrdered}
-                  disabled={!allSelectedAreLocked || markOrderedMut.isPending}
+                  disabled={!allSelectedArePending || markOrderedMut.isPending}
                 >
-                  {markOrderedMut.isPending ? '처리 중...' : `선택한 ${lockedSelected.length}권 신청완료 처리`}
+                  {markOrderedMut.isPending ? '처리 중...' : `선택한 ${pendingSelected.length}권 신청완료 처리`}
                 </Button>
                 <Button
                   variant="ghost"
-                  onClick={handleMarkLocked}
-                  disabled={!allSelectedAreOrdered || markLockedMut.isPending}
+                  onClick={handleUnmarkOrdered}
+                  disabled={!allSelectedAreOrdered || unmarkOrderedMut.isPending}
                 >
-                  {markLockedMut.isPending ? '취소 중...' : `선택한 ${orderedSelected.length}권 신청완료 취소`}
+                  {unmarkOrderedMut.isPending ? '취소 중...' : `선택한 ${orderedSelected.length}권 신청완료 취소`}
                 </Button>
               </div>
               <ol className="text-xs text-zinc-600 mt-3 leading-relaxed list-decimal list-inside space-y-1">
                 <li>카트에 담을 책들을 체크 → "스크립트 복사" → 알라딘 탭 F12 콘솔에 붙여넣기 → 카트 자동 담기.</li>
                 <li>알라딘에서 결제 진행 후 모모로 돌아옴.</li>
                 <li>방금 담은 책들을 다시 체크 → "신청완료 처리" → 회색으로 비활성화 + 합산 주문서 누적.</li>
-                <li>실수했다면 ORDERED 행을 체크 → "신청완료 취소"로 LOCKED 상태로 되돌릴 수 있습니다.</li>
+                <li>실수했다면 ORDERED 행을 체크 → "신청완료 취소"로 PENDING 상태로 되돌릴 수 있습니다.</li>
               </ol>
             </>
           )}
@@ -296,6 +341,38 @@ export default function AdminBookRequestsPage() {
               전체 선택
             </CheckboxRow>
           </div>
+
+          {/* 미신청 회원 */}
+          {unsubmittedData && (
+            <div className="mb-4 rounded-lg border border-amber-900/30 bg-amber-950/10 p-3">
+              {unsubmittedData.unsubmitted.length === 0 ? (
+                <p className="text-sm text-emerald-300">
+                  🎉 모든 회원이 신청 완료 ({unsubmittedData.submittedCount}/{unsubmittedData.totalActiveMembers})
+                </p>
+              ) : (
+                <>
+                  <p className="text-xs text-amber-400 mb-2">
+                    미신청 회원 {unsubmittedData.unsubmitted.length}명
+                    <span className="text-zinc-500 ml-1">
+                      · 제출 {unsubmittedData.submittedCount}/{unsubmittedData.totalActiveMembers}
+                    </span>
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {unsubmittedData.unsubmitted.map((m) => (
+                      <span
+                        key={m.memberId}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-zinc-950/60 border border-amber-900/30 px-2.5 py-1 text-xs"
+                      >
+                        <span className="text-zinc-200">{m.name}</span>
+                        <span className="text-zinc-500">·</span>
+                        <span className="text-zinc-500">{m.email}</span>
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {isLoading && <p className="text-sm text-zinc-500">불러오는 중...</p>}
           {!isLoading && groups.length === 0 && <p className="text-sm text-zinc-500">신청이 없습니다.</p>}
@@ -342,7 +419,7 @@ export default function AdminBookRequestsPage() {
                               </p>
                               <p className="text-xs text-zinc-500 truncate">
                                 {r.author} · {r.categoryLabel} · {r.statusLabel}
-                                {!r.aladinItemCode && r.status === 'LOCKED' && (
+                                {!r.aladinItemCode && r.status === 'PENDING' && (
                                   <span className="text-amber-400 ml-1">· (K-CODE 없음)</span>
                                 )}
                               </p>

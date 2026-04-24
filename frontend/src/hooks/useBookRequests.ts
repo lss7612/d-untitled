@@ -29,15 +29,15 @@ export function useCreateBookRequest(clubId: number) {
   return useMutation({
     mutationFn: (vars: { url: string; category: BookCategory }) =>
       createBookRequest(clubId, vars.url, vars.category),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['bookRequests', 'my', clubId] })
-    },
+    onSuccess: () => invalidateBookRequestsAll(qc, clubId),
   })
 }
 
 function invalidateBookRequestsAll(qc: ReturnType<typeof useQueryClient>, clubId: number) {
   qc.invalidateQueries({ queryKey: ['bookRequests', 'my', clubId] })
   qc.invalidateQueries({ queryKey: ['admin', 'bookRequests', clubId] })
+  qc.invalidateQueries({ queryKey: ['admin', 'bookRequests', 'unsubmitted', clubId] })
+  qc.invalidateQueries({ queryKey: ['admin', 'budgets', 'summary', clubId] })
   qc.invalidateQueries({ queryKey: ['admin', 'order', clubId] })
 }
 

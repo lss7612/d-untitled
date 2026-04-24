@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import AppHeader from '@/components/AppHeader'
+import BudgetShareDialog from '@/components/BudgetShareDialog'
 import { Button } from '@/components/ui/button'
 import {
   useMyBookRequests,
@@ -10,9 +11,19 @@ import {
   useDeleteBookRequest,
   useMarkReceived,
 } from '@/hooks/useBookRequests'
+import {
+  useIncomingShares,
+  useOutgoingShares,
+  useAcceptShare,
+  useRejectShare,
+  useCancelShare,
+} from '@/hooks/useBudgetShares'
+import { useMe } from '@/hooks/useMe'
 import { useMyClubs } from '@/hooks/useClubs'
 import { CheckboxRow } from '@/components/ui/checkbox-row'
 import { BOOK_CATEGORIES, type BookCategory, type ParsedBookResponse } from '@/api/bookRequests'
+import { useRequestBookExemption } from '@/hooks/useBookExemptions'
+import type { ApiError } from '@/api/client'
 
 const MUJE_CLUB_ID = 1
 
@@ -24,11 +35,28 @@ export default function BookRequestPage() {
 
   const { data: my, isLoading } = useMyBookRequests(MUJE_CLUB_ID)
   const { data: myClubs } = useMyClubs()
+  const { data: me } = useMe()
   const parseMut = useParseBookUrl(MUJE_CLUB_ID)
   const markReceivedMut = useMarkReceived(MUJE_CLUB_ID)
   const [receiveSelected, setReceiveSelected] = useState<Set<number>>(new Set())
   const createMut = useCreateBookRequest(MUJE_CLUB_ID)
   const deleteMut = useDeleteBookRequest(MUJE_CLUB_ID)
+  const exemptionMut = useRequestBookExemption(MUJE_CLUB_ID)
+
+  // 중복 책 에러 상태 (duplicate detected -> 제한풀기 버튼 노출)
+  const [duplicateBook, setDuplicateBook] = useState<{
+    id: number
+    title: string
+  } | null>(null)
+  const [exemptionReason, setExemptionReason] = useState('')
+
+  const targetMonth = my?.targetMonth ?? ''
+  const { data: incoming = [] } = useIncomingShares(MUJE_CLUB_ID, targetMonth)
+  const { data: outgoing = [] } = useOutgoingShares(MUJE_CLUB_ID, targetMonth)
+  const acceptShareMut = useAcceptShare(MUJE_CLUB_ID)
+  const rejectShareMut = useRejectShare(MUJE_CLUB_ID)
+  const cancelShareMut = useCancelShare(MUJE_CLUB_ID)
+  const [shareDialogOpen, setShareDialogOpen] = useState(false)
 
   const isAdmin = myClubs?.some((c) => c.id === MUJE_CLUB_ID && c.myRole === 'ADMIN') ?? false
 
@@ -42,6 +70,7 @@ export default function BookRequestPage() {
 
   function handleCreate() {
     if (!parsed) return
+    setDuplicateBook(null) // 기존 중복 카드 초기화
     createMut.mutate(
       { url: parsed.sourceUrl, category },
       {
@@ -49,6 +78,33 @@ export default function BookRequestPage() {
           toast.success('책 신청이 접수되었습니다.')
           setUrl('')
           setParsed(null)
+          setDuplicateBook(null)
+        },
+        onError: (e) => {
+          const err = e as ApiError
+          if (err.details?.code === 'DUPLICATE_BOOK') {
+            setDuplicateBook({
+              id: Number(err.details.duplicateBookId),
+              title: String(err.details.duplicateBookTitle ?? parsed.title),
+            })
+            toast.error(err.message)
+          } else {
+            toast.error(e.message)
+          }
+        },
+      }
+    )
+  }
+
+  function handleRequestExemption() {
+    if (!duplicateBook) return
+    exemptionMut.mutate(
+      { bookId: duplicateBook.id, reason: exemptionReason.trim() || undefined },
+      {
+        onSuccess: () => {
+          toast.success('제한풀기 신청이 접수되었습니다. 관리자 승인을 기다려주세요.')
+          setDuplicateBook(null)
+          setExemptionReason('')
         },
         onError: (e) => toast.error(e.message),
       }
@@ -84,23 +140,79 @@ export default function BookRequestPage() {
 
         {/* 잔여 예산 배너 */}
         <div className="mb-6 rounded-xl border border-zinc-800/40 bg-zinc-900/50 p-4">
-          {isLoading ? (
+          {isLoading || !my ? (
             <p className="text-sm text-zinc-500">불러오는 중...</p>
           ) : (
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-zinc-500">이번 달 잔여 예산</p>
-                <p className="text-2xl font-semibold text-zinc-100 mt-1">
-                  {my?.budgetRemaining.toLocaleString()}원
-                </p>
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-zinc-500">이번 달 잔여 예산</p>
+                  <p className="text-2xl font-semibold text-zinc-100 mt-1">
+                    {my.budgetRemaining.toLocaleString()}원
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-zinc-500">사용 / 실한도</p>
+                  <p className="text-sm text-zinc-400 mt-1">
+                    {my.budgetUsed.toLocaleString()} / {my.effectiveLimit.toLocaleString()}원
+                  </p>
+                </div>
               </div>
-              <div className="text-right">
-                <p className="text-xs text-zinc-500">사용 / 한도</p>
-                <p className="text-sm text-zinc-400 mt-1">
-                  {my?.budgetUsed.toLocaleString()} / {my?.budgetLimit.toLocaleString()}원
-                </p>
+
+              {/* 세부 내역: 기본 한도 · 받은 나눔 · 전달한 나눔 */}
+              <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+                <div className="rounded-lg bg-zinc-950/60 border border-zinc-800/50 px-3 py-2">
+                  <p className="text-zinc-500">기본 한도</p>
+                  <p className="mt-0.5 text-zinc-200">{my.budgetLimit.toLocaleString()}원</p>
+                </div>
+                <div className="rounded-lg bg-sky-950/30 border border-sky-900/40 px-3 py-2">
+                  <p className="text-sky-300/80">받은 나눔</p>
+                  <p className="mt-0.5 text-sky-200">+{my.transferIn.toLocaleString()}원</p>
+                </div>
+                <div className="rounded-lg bg-rose-950/20 border border-rose-900/30 px-3 py-2">
+                  <p className="text-rose-300/80">전달한 나눔</p>
+                  <p className="mt-0.5 text-rose-200">−{my.transferOut.toLocaleString()}원</p>
+                </div>
               </div>
-            </div>
+
+              {/* ACCEPTED 이체 뱃지 */}
+              {my.acceptedShares.length > 0 && me && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {my.acceptedShares.map((s) => {
+                    const iAmRequester = s.requesterId === me.id
+                    const counterpart = iAmRequester ? s.senderName : s.requesterName
+                    return (
+                      <span
+                        key={s.id}
+                        className={[
+                          'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] border',
+                          iAmRequester
+                            ? 'bg-sky-950/40 border-sky-900/60 text-sky-200'
+                            : 'bg-rose-950/30 border-rose-900/50 text-rose-200',
+                        ].join(' ')}
+                        title={s.note ?? ''}
+                      >
+                        {iAmRequester
+                          ? `${counterpart ?? '?'}님에게 받음 +${s.amount.toLocaleString()}원`
+                          : `${counterpart ?? '?'}님에게 전달 −${s.amount.toLocaleString()}원`}
+                      </span>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* 나눔 받기 버튼 */}
+              <div className="mt-4 flex justify-end">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShareDialogOpen(true)}
+                  disabled={locked}
+                >
+                  나눔 받기
+                </Button>
+              </div>
+            </>
           )}
           {locked && (
             <div className="mt-4 -mx-4 -mb-4 px-4 py-2 rounded-b-xl bg-amber-950/40 border-t border-amber-900/50">
@@ -108,6 +220,108 @@ export default function BookRequestPage() {
             </div>
           )}
         </div>
+
+        {/* 내게 온 나눔 신청 (수락/거절) */}
+        {incoming.length > 0 && (
+          <section className="mb-6 rounded-xl border border-sky-900/40 bg-sky-950/20 p-5">
+            <p className="text-sm font-medium text-sky-300 mb-3">
+              💌 내게 온 나눔 신청 ({incoming.length})
+            </p>
+            <ul className="space-y-2">
+              {incoming.map((s) => (
+                <li
+                  key={s.id}
+                  className="rounded-lg border border-sky-900/40 bg-zinc-950/50 px-3 py-2.5 flex items-center gap-3"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-zinc-200">
+                      <span className="font-medium">{s.requesterName ?? '?'}</span>
+                      {'님이 '}
+                      <span className="text-sky-300">{s.amount.toLocaleString()}원</span>
+                      {' 나눔을 요청했습니다.'}
+                    </p>
+                    {s.note && <p className="text-xs text-zinc-500 mt-0.5 truncate">{s.note}</p>}
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      acceptShareMut.mutate(s.id, {
+                        onSuccess: () => toast.success('수락했습니다.'),
+                        onError: (e) => toast.error(e.message),
+                      })
+                    }
+                    disabled={acceptShareMut.isPending}
+                  >
+                    수락
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      rejectShareMut.mutate(s.id, {
+                        onSuccess: () => toast.success('거절했습니다.'),
+                        onError: (e) => toast.error(e.message),
+                      })
+                    }
+                    disabled={rejectShareMut.isPending}
+                  >
+                    거절
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* 내가 보낸 나눔 신청 (취소) */}
+        {outgoing.length > 0 && (
+          <section className="mb-6 rounded-xl border border-zinc-800/40 bg-zinc-900/40 p-5">
+            <p className="text-sm font-medium text-zinc-400 mb-3">
+              ✉️ 내가 보낸 나눔 신청 ({outgoing.length})
+            </p>
+            <ul className="space-y-2">
+              {outgoing.map((s) => (
+                <li
+                  key={s.id}
+                  className="rounded-lg border border-zinc-800/40 bg-zinc-950/50 px-3 py-2.5 flex items-center gap-3"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-zinc-300">
+                      <span className="font-medium">{s.senderName ?? '?'}</span>
+                      {'님에게 '}
+                      <span className="text-zinc-200">{s.amount.toLocaleString()}원</span>
+                      {' 요청 · 대기 중'}
+                    </p>
+                    {s.note && <p className="text-xs text-zinc-500 mt-0.5 truncate">{s.note}</p>}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      cancelShareMut.mutate(s.id, {
+                        onSuccess: () => toast.success('나눔 신청을 취소했습니다.'),
+                        onError: (e) => toast.error(e.message),
+                      })
+                    }
+                    disabled={cancelShareMut.isPending}
+                  >
+                    취소
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* 나눔 다이얼로그 */}
+        {targetMonth && (
+          <BudgetShareDialog
+            open={shareDialogOpen}
+            clubId={MUJE_CLUB_ID}
+            yearMonth={targetMonth}
+            onClose={() => setShareDialogOpen(false)}
+          />
+        )}
 
         {/* 관리자 안내 */}
         {isAdmin && (
@@ -190,6 +404,58 @@ export default function BookRequestPage() {
             <div className="mt-5 flex justify-end">
               <Button onClick={handleCreate} disabled={createMut.isPending}>
                 {createMut.isPending ? '신청 중...' : '신청하기'}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* 중복 책 경고 + 제한풀기 신청 */}
+        {duplicateBook && (
+          <div className="mb-8 rounded-xl border border-amber-900/50 bg-amber-950/30 p-5">
+            <div className="flex items-start gap-3">
+              <span className="text-lg leading-none">⚠️</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-amber-200">
+                  이미 보유 중인 책입니다
+                </p>
+                <p className="text-sm text-amber-100/80 mt-1 truncate">
+                  「{duplicateBook.title}」
+                </p>
+                <p className="text-xs text-amber-300/70 mt-2">
+                  같은 책이지만 꼭 한 번 더 신청하고 싶다면, 아래에 사유를 적어
+                  관리자에게 제한풀기를 신청할 수 있습니다.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4">
+              <label className="block text-xs text-amber-300/80 mb-2">
+                제한풀기 사유 <span className="text-amber-400/60">(선택)</span>
+              </label>
+              <textarea
+                value={exemptionReason}
+                onChange={(e) => setExemptionReason(e.target.value)}
+                placeholder="예: 여러 명이 돌려 읽고 싶습니다."
+                rows={3}
+                maxLength={500}
+                className="w-full px-3 py-2 rounded-lg border border-amber-900/50 bg-zinc-950 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-700"
+              />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setDuplicateBook(null)
+                  setExemptionReason('')
+                }}
+                disabled={exemptionMut.isPending}
+              >
+                닫기
+              </Button>
+              <Button
+                onClick={handleRequestExemption}
+                disabled={exemptionMut.isPending}
+              >
+                {exemptionMut.isPending ? '신청 중...' : '제한풀기 신청'}
               </Button>
             </div>
           </div>

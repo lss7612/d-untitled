@@ -226,8 +226,7 @@ public class DummyDataSeeder implements CommandLineRunner {
     }
 
     private BookRequestStatus statusFor(int index) {
-        if (index < 5) return BookRequestStatus.PENDING;
-        if (index < 10) return BookRequestStatus.LOCKED;
+        if (index < 10) return BookRequestStatus.PENDING;
         if (index < 18) return BookRequestStatus.ORDERED;
         if (index < 22) return BookRequestStatus.ARRIVED;
         return BookRequestStatus.RECEIVED;
@@ -236,23 +235,16 @@ public class DummyDataSeeder implements CommandLineRunner {
     private void applyStatus(BookRequest br, BookRequestStatus status) {
         switch (status) {
             case PENDING -> { /* default */ }
-            case LOCKED -> br.changeStatus(BookRequestStatus.LOCKED);
-            case ORDERED -> {
-                br.changeStatus(BookRequestStatus.LOCKED);
-                br.changeStatus(BookRequestStatus.ORDERED);
-            }
+            case ORDERED -> br.changeStatus(BookRequestStatus.ORDERED);
             case ARRIVED -> {
-                br.changeStatus(BookRequestStatus.LOCKED);
                 br.changeStatus(BookRequestStatus.ORDERED);
                 br.markArrived();
             }
             case RECEIVED -> {
-                br.changeStatus(BookRequestStatus.LOCKED);
                 br.changeStatus(BookRequestStatus.ORDERED);
                 br.markArrived();
                 br.markReceived();
             }
-            default -> { /* SHIPPING 등 unused */ }
         }
     }
 
