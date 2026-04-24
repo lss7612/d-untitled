@@ -218,3 +218,22 @@ com.example.demo
 - **낙관적 업데이트**: 책 신청 취소, 수령 완료 처리 등 사용자 응답성이 중요한 액션에 TanStack Query 낙관적 업데이트를 적용한다.
 - **Mock API 선행 개발**: 백엔드 API 미완성 구간은 MSW(Mock Service Worker) 기반 Mock으로 UI를 선행 구현한다.
 - **E2E 테스트 우선 시나리오 (Playwright)**: 로그인 플로우, 책 신청 정상/오류 플로우, 독후감 제출 플로우, 관리자 벌점 부여 플로우 4가지를 핵심으로 우선 작성한다.
+
+---
+
+## 실제 구현 기록 (로드맵 대비)
+
+초기 로드맵 이후 실제 구현된 부가 모듈. 상세는 각 문서 참조.
+
+- **Phase 2 (무제 핵심)**
+  - 책 신청 + 마감 잠금 + 합산 주문서 → `14-order-aladin-cart.md`
+  - 독후감 + 피드 + 미제출 관리 → `15-book-report-feed.md`
+  - 월별 예산 + 나눔 → `13-budget-module.md`
+- **Phase 3 (운영 자동화)**
+  - 책 카탈로그 + 중복 체크 + 제한풀기 → `08-book-catalog-exemption.md`, `09-owned-books-and-quota-exemption.md`
+  - 알림 추상화 (Logging v1 완료, Slack v2 예정) → `12-notification-abstraction.md`
+- **Phase 3.5 (권한/운영 확장)**
+  - 가입 신청/승인/역할 변경 → `10-club-membership-flow.md`
+  - DEVELOPER 전역 역할 + 화이트리스트 → `11-developer-role-and-whitelist.md`
+  - 동적 설정(AppConfig) → `16-app-config.md`
+  - 개발 지원(시드/진단) → `17-dev-tooling.md`
