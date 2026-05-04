@@ -29,9 +29,18 @@ public class AladinApiClient {
         "<script type=\"application/ld\\+json\">(.*?)</script>", Pattern.DOTALL);
     private static final Pattern ISBN_META_PATTERN = Pattern.compile(
         "<meta property=\"books:isbn\" content=\"([0-9Xx]+)\"\\s*/>");
-    /** 알라딘 내부 도서 코드(K-CODE). 장바구니 URL `wbasket.aspx?AddBook=K...`에서 추출. */
+    /**
+     * 알라딘 카트 식별 코드. 장바구니 URL `wbasket.aspx?AddBook=<code>` 에서 추출.
+     * 책마다 형식이 다르다 — 관찰된 패턴:
+     *   - {@code K292830716} (K-prefix, 한국 일부 도서)
+     *   - {@code 8925569574} (prefix 없는 10자리, ISBN-10. 한국 책에서 흔함)
+     *   - {@code 0718197038} (prefix 없는 10자리, 외서)
+     *   - {@code U604737277} (U-prefix, 일부 외서)
+     * 셋 다 동일한 카트 API (`BasketAjax.aspx?method=basketaddwithexistcheck&isbn=<code>`)
+     * 의 isbn 파라미터로 그대로 동작 — 검증 완료.
+     */
     private static final Pattern ALADIN_ITEM_CODE_PATTERN = Pattern.compile(
-        "wbasket\\.aspx\\?AddBook=(K[0-9]+)");
+        "wbasket\\.aspx\\?AddBook=([A-Z]?[0-9]+)");
     private static final Pattern ALLOWED_HOST = Pattern.compile("^https?://(www\\.)?aladin\\.co\\.kr/.+");
 
     private final HttpClient httpClient = HttpClient.newBuilder()

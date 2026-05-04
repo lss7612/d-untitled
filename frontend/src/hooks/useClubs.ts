@@ -3,6 +3,9 @@ import {
   fetchAllClubs,
   fetchMyClubs,
   fetchClubSchedules,
+  createSchedule,
+  updateSchedule,
+  deleteSchedule,
   requestJoinClub,
   fetchPendingJoinRequests,
   approveJoinRequest,
@@ -10,6 +13,7 @@ import {
   fetchClubMembers,
   changeClubMemberRole,
   type ClubRole,
+  type ScheduleRequest,
 } from '@/api/clubs'
 
 export function useAllClubs() {
@@ -25,6 +29,37 @@ export function useClubSchedules(clubId: number, yearMonth?: string) {
     queryKey: ['clubs', clubId, 'schedules', yearMonth ?? 'all'],
     queryFn: () => fetchClubSchedules(clubId, yearMonth),
     enabled: clubId > 0,
+  })
+}
+
+/** 일정 등록/수정/삭제 후 일정 + 독후감(deadline) 캐시를 함께 무효화. */
+function invalidateSchedules(qc: ReturnType<typeof useQueryClient>, clubId: number) {
+  qc.invalidateQueries({ queryKey: ['clubs', clubId, 'schedules'] })
+  qc.invalidateQueries({ queryKey: ['bookReports'] })
+}
+
+export function useCreateSchedule(clubId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (req: ScheduleRequest) => createSchedule(clubId, req),
+    onSuccess: () => invalidateSchedules(qc, clubId),
+  })
+}
+
+export function useUpdateSchedule(clubId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { id: number; req: ScheduleRequest }) =>
+      updateSchedule(clubId, vars.id, vars.req),
+    onSuccess: () => invalidateSchedules(qc, clubId),
+  })
+}
+
+export function useDeleteSchedule(clubId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => deleteSchedule(clubId, id),
+    onSuccess: () => invalidateSchedules(qc, clubId),
   })
 }
 

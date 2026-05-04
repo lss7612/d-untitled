@@ -202,6 +202,9 @@ public class BookRequestService {
     public BookRequestResponse update(Long clubId, Long memberId, Long id, BookRequestUpdateRequest req) {
         clubService.requireMembership(clubId, memberId);
         BookRequest br = loadOwned(id, clubId, memberId);
+        if (monthLockService.isLocked(clubId, br.getTargetYearMonth())) {
+            throw new BusinessException("이번 달 신청이 마감되었습니다.", 400);
+        }
         if (!br.isEditable()) {
             throw new BusinessException("수정할 수 없는 상태입니다.", 400);
         }
@@ -215,6 +218,9 @@ public class BookRequestService {
     public void delete(Long clubId, Long memberId, Long id) {
         clubService.requireMembership(clubId, memberId);
         BookRequest br = loadOwned(id, clubId, memberId);
+        if (monthLockService.isLocked(clubId, br.getTargetYearMonth())) {
+            throw new BusinessException("이번 달 신청이 마감되었습니다.", 400);
+        }
         if (!br.isEditable()) {
             throw new BusinessException("취소할 수 없는 상태입니다.", 400);
         }

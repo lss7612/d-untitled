@@ -50,11 +50,12 @@ interface CartItem {
 /**
  * 알라딘 장바구니 자동화 스크립트.
  *
- * 알고리즘: 각 유니크 (K-code, qty) 마다 알라딘 실제 담기 엔드포인트 한 번 호출.
- *   `GET /shop/BasketAjax.aspx?method=basketaddwithexistcheck&isbn=<K-code>&qty=<N>&_=<ts>`
+ * 알고리즘: 각 유니크 (카트 코드, qty) 마다 알라딘 실제 담기 엔드포인트 한 번 호출.
+ *   `GET /shop/BasketAjax.aspx?method=basketaddwithexistcheck&isbn=<code>&qty=<N>&_=<ts>`
  *
- * - 파라미터명은 `isbn` 이지만 실제 값은 **K-code** (알라딘 내부 컨벤션).
- * - `qty` 로 한 번에 N권 담기. 기존 `AddBook` + `UpdateQty` 2단계는 K-code/ISBN 키 불일치로 실제 수량
+ * - 파라미터명은 `isbn` 이지만 실제 값은 알라딘 카트 식별 코드 (K-prefix / U-prefix / ISBN-10 등).
+ *   책 페이지의 `wbasket.aspx?AddBook=<code>` 에서 추출 ([A-Z]?[0-9]+ 형식).
+ * - `qty` 로 한 번에 N권 담기. 기존 `AddBook` + `UpdateQty` 2단계는 코드/ISBN 키 불일치로 실제 수량
  *   반영이 안 되는 케이스가 있어 폐기.
  * - 응답은 `{"Success":"true","Exist":"false","BranchType":..,"Title":"..","Price":"..."}` 형식.
  *   실패면 `Success:"false"`. 이미 카트에 있는 동일 상품이면 `Exist:"true"`.
@@ -86,7 +87,7 @@ function buildAutomationScript(items: CartItem[]): string {
   })();`.replace(/\n\s+/g, '')
 }
 
-/** 선택된 PENDING 행을 ISBN 기준으로 집계해 CartItem[] 로 변환. K-code 없거나 ISBN 없으면 제외. */
+/** 선택된 PENDING 행을 ISBN 기준으로 집계해 CartItem[] 로 변환. 카트 코드 없거나 ISBN 없으면 제외. */
 function aggregateCartItems(rows: AdminBookRequestRow[]): CartItem[] {
   const map = new Map<string, CartItem>()
   for (const r of rows) {
@@ -154,7 +155,7 @@ export default function AdminBookRequestsPage() {
   const allSelectedArePending = selectedRows.length > 0 && pendingSelected.length === selectedRows.length
   const allSelectedAreOrdered = selectedRows.length > 0 && orderedSelected.length === selectedRows.length
 
-  // 카트 스크립트는 PENDING + K-CODE 있는 것만. 같은 책은 ISBN 기준 집계해 count=N 으로.
+  // 카트 스크립트는 PENDING + 알라딘 카트 코드 있는 것만. 같은 책은 ISBN 기준 집계해 count=N 으로.
   const cartItems = useMemo(() => aggregateCartItems(pendingSelected), [pendingSelected])
   const cartItemTotalQty = cartItems.reduce((s, x) => s + x.count, 0)
   const missingCodeCount = pendingSelected.length - cartItemTotalQty
@@ -179,7 +180,7 @@ export default function AdminBookRequestsPage() {
 
   async function handleCopyScript() {
     if (cartItems.length === 0) {
-      toast.warning('카트에 담을 책이 없습니다 (신청 대기 + K-CODE + ISBN 필요).')
+      toast.warning('카트에 담을 책이 없습니다 (신청 대기 + 알라딘 코드 + ISBN 필요).')
       return
     }
     const script = buildAutomationScript(cartItems)
@@ -352,7 +353,7 @@ export default function AdminBookRequestsPage() {
                 선택: {selectedQty}권 · ₩{selectedAmount.toLocaleString()}
                 {missingCodeCount > 0 && allSelectedArePending && (
                   <span className="ml-2 text-amber-400">
-                    (K-CODE 없는 {missingCodeCount}권 카트 제외)
+                    (알라딘 코드 없는 {missingCodeCount}권 카트 제외)
                   </span>
                 )}
               </p>
@@ -480,11 +481,26 @@ export default function AdminBookRequestsPage() {
                               <p className="text-xs text-zinc-500 truncate">
                                 {r.author} · {r.categoryLabel} · {r.statusLabel}
                                 {!r.aladinItemCode && r.status === 'PENDING' && (
-                                  <span className="text-amber-400 ml-1">· (K-CODE 없음)</span>
+                                  <span className="text-amber-400 ml-1">· (알라딘 코드 없음)</span>
                                 )}
                               </p>
                             </div>
-                            <p className="text-sm text-zinc-300 whitespace-nowrap">₩{r.price.toLocaleString()}</p>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <p className="text-sm text-zinc-300 whitespace-nowrap">₩{r.price.toLocaleString()}</p>
+                              {r.sourceUrl && (
+                                <a
+                                  href={r.sourceUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  aria-label="알라딘 페이지 새 탭으로 열기"
+                                  className="group inline-flex items-center gap-1 text-zinc-400 hover:text-zinc-100 px-1.5 py-0.5 rounded hover:bg-zinc-800/60 leading-none whitespace-nowrap"
+                                >
+                                  <span className="hidden group-hover:inline text-xs">링크로 이동</span>
+                                  <span>↗</span>
+                                </a>
+                              )}
+                            </div>
                           </CheckboxRow>
                         </li>
                       )

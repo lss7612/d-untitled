@@ -16,6 +16,7 @@ import AdminArrivalsPage from '@/pages/AdminArrivalsPage'
 import AdminClubMembersPage from '@/pages/AdminClubMembersPage'
 import AdminBookExemptionsPage from '@/pages/AdminBookExemptionsPage'
 import AdminExemptBooksPage from '@/pages/AdminExemptBooksPage'
+import AdminSchedulesPage from '@/pages/AdminSchedulesPage'
 import DeveloperWhitelistPage from '@/pages/DeveloperWhitelistPage'
 import ProtectedRoute from '@/components/ProtectedRoute'
 
@@ -41,6 +42,7 @@ function App() {
             <Route path="/muje/admin/members" element={<AdminClubMembersPage />} />
             <Route path="/muje/admin/book-exemptions" element={<AdminBookExemptionsPage />} />
             <Route path="/muje/admin/exempt-books" element={<AdminExemptBooksPage />} />
+            <Route path="/muje/admin/schedules" element={<AdminSchedulesPage />} />
             <Route path="/developer/whitelist" element={<DeveloperWhitelistPage />} />
           </Route>
         </Routes>

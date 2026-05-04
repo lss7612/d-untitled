@@ -295,6 +295,16 @@ export default function MujePage() {
                     <p className="text-xs text-zinc-500 mt-0.5">제한풀기 승인된 책 되돌리기</p>
                   </div>
                 </button>
+                <button
+                  onClick={() => navigate('/muje/admin/schedules')}
+                  className="rounded-xl border border-amber-900/40 bg-amber-950/20 p-5 flex items-center gap-3 hover:bg-amber-950/30 transition-colors cursor-pointer text-left"
+                >
+                  <span className="text-2xl">📅</span>
+                  <div>
+                    <p className="text-sm text-zinc-200">일정 관리</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">책 신청 / 독후감 마감일 설정</p>
+                  </div>
+                </button>
               </div>
             </section>
           )}

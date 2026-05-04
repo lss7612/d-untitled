@@ -663,9 +663,10 @@ export default function BookRequestPage() {
                   <Button
                     variant="ghost"
                     onClick={() => handleDelete(br.id)}
-                    disabled={deleteMut.isPending}
+                    disabled={deleteMut.isPending || locked}
+                    title={locked ? '이번 달 신청이 마감되어 취소할 수 없습니다.' : undefined}
                   >
-                    취소
+                    {locked ? '🔒 잠금 (취소불가)' : '취소'}
                   </Button>
                 )}
               </div>

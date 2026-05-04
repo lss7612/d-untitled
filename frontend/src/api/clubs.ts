@@ -37,6 +37,30 @@ export const fetchClubSchedules = (clubId: number, yearMonth?: string) => {
   return apiFetch<ScheduleResponse[]>(`/api/v1/clubs/${clubId}/schedules${qs}`)
 }
 
+/** 일정 등록/수정 요청. date 는 "YYYY-MM-DD". */
+export interface ScheduleRequest {
+  typeCode: string
+  date: string
+  description?: string | null
+}
+
+export const createSchedule = (clubId: number, req: ScheduleRequest) =>
+  apiFetch<ScheduleResponse>(`/api/v1/admin/clubs/${clubId}/schedules`, {
+    method: 'POST',
+    body: JSON.stringify(req),
+  })
+
+export const updateSchedule = (clubId: number, id: number, req: ScheduleRequest) =>
+  apiFetch<ScheduleResponse>(`/api/v1/admin/clubs/${clubId}/schedules/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(req),
+  })
+
+export const deleteSchedule = (clubId: number, id: number) =>
+  apiFetch<void>(`/api/v1/admin/clubs/${clubId}/schedules/${id}`, {
+    method: 'DELETE',
+  })
+
 export const requestJoinClub = (clubId: number) =>
   apiFetch<JoinRequestResponse>(`/api/v1/clubs/${clubId}/join-requests`, {
     method: 'POST',
