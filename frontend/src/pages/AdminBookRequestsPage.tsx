@@ -117,12 +117,33 @@ export default function AdminBookRequestsPage() {
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
 
-  const groups = useMemo(() => groupByMember(rows ?? []), [rows])
-  const allIds = useMemo(() => (rows ?? []).map((r) => r.id), [rows])
-  const allChecked = allIds.length > 0 && allIds.every((id) => selectedIds.has(id))
+  // 신청 단계별 분리: PENDING vs ORDERED+ (ORDERED, ARRIVED, RECEIVED).
+  // PENDING 만 위쪽 "신청" 섹션에서 작업 대상으로 노출하고, 나머지는 아래 "신청 완료" 섹션에 참조용으로 둔다.
+  const pendingRows = useMemo(
+    () => (rows ?? []).filter((r) => r.status === 'PENDING'),
+    [rows]
+  )
+  const completedRows = useMemo(
+    () => (rows ?? []).filter((r) => r.status !== 'PENDING'),
+    [rows]
+  )
+  const pendingGroups = useMemo(() => groupByMember(pendingRows), [pendingRows])
+  const completedGroups = useMemo(() => groupByMember(completedRows), [completedRows])
+  const pendingAllIds = useMemo(() => pendingRows.map((r) => r.id), [pendingRows])
+  const pendingAllChecked =
+    pendingAllIds.length > 0 && pendingAllIds.every((id) => selectedIds.has(id))
 
-  function toggleAll() {
-    setSelectedIds(allChecked ? new Set() : new Set(allIds))
+  function togglePendingAll() {
+    setSelectedIds((prev) => {
+      if (pendingAllChecked) {
+        const next = new Set(prev)
+        pendingAllIds.forEach((id) => next.delete(id))
+        return next
+      }
+      const next = new Set(prev)
+      pendingAllIds.forEach((id) => next.add(id))
+      return next
+    })
   }
 
   function toggleGroup(group: MemberGroup) {
@@ -394,123 +415,155 @@ export default function AdminBookRequestsPage() {
           )}
         </section>
 
-        {/* 신청 목록 — 회원별 그룹 */}
-        <section className="rounded-xl border border-zinc-800/40 bg-zinc-900/50 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium text-zinc-200">전체 신청 ({rows?.length ?? 0}건)</p>
-            <CheckboxRow checked={allChecked} onChange={() => toggleAll()} className="px-3 py-2 text-xs text-zinc-400">
-              전체 선택
-            </CheckboxRow>
-          </div>
-
-          {/* 미신청 회원 */}
-          {unsubmittedData && (
-            <div className="mb-4 rounded-lg border border-amber-900/30 bg-amber-950/10 p-3">
-              {unsubmittedData.unsubmitted.length === 0 ? (
-                <p className="text-sm text-emerald-300">
-                  🎉 모든 회원이 신청 완료 ({unsubmittedData.submittedCount}/{unsubmittedData.totalActiveMembers})
-                </p>
-              ) : (
-                <>
-                  <p className="text-xs text-amber-400 mb-2">
-                    미신청 회원 {unsubmittedData.unsubmitted.length}명
-                    <span className="text-zinc-500 ml-1">
-                      · 제출 {unsubmittedData.submittedCount}/{unsubmittedData.totalActiveMembers}
-                    </span>
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {unsubmittedData.unsubmitted.map((m) => (
-                      <span
-                        key={m.memberId}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-zinc-950/60 border border-amber-900/30 px-2.5 py-1 text-xs"
+        {/* 신청 목록 — 단계별 두 섹션. PENDING 은 위, ORDERED+ 는 아래. */}
+        {(() => {
+          // 회원별 그룹 카드 렌더 (PENDING/완료 섹션 공용).
+          const renderGroupCard = (g: MemberGroup) => {
+            const groupAmount = g.rows.reduce((s, r) => s + r.price, 0)
+            const groupChecked = g.rows.every((r) => selectedIds.has(r.id))
+            return (
+              <div key={g.memberId} className="border border-zinc-800/40 rounded-lg overflow-hidden">
+                <CheckboxRow
+                  checked={groupChecked}
+                  onChange={() => toggleGroup(g)}
+                  className="bg-zinc-950/40"
+                >
+                  <span className="text-sm font-medium text-zinc-200">{g.memberName}</span>
+                  <span className="text-xs text-zinc-500">
+                    {g.rows.length}권 · ₩{groupAmount.toLocaleString()}
+                  </span>
+                </CheckboxRow>
+                <ul>
+                  {g.rows.map((r) => {
+                    const isOrdered = r.status === 'ORDERED'
+                    const isCompleted = r.status !== 'PENDING'
+                    return (
+                      <li
+                        key={r.id}
+                        className={`border-t border-zinc-800/30 ${
+                          isCompleted ? 'bg-emerald-950/20 opacity-70' : 'hover:bg-zinc-950/30'
+                        }`}
                       >
-                        <span className="text-zinc-200">{m.name}</span>
-                        <span className="text-zinc-500">·</span>
-                        <span className="text-zinc-500">{m.email}</span>
-                      </span>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {isLoading && <p className="text-sm text-zinc-500">불러오는 중...</p>}
-          {!isLoading && groups.length === 0 && <p className="text-sm text-zinc-500">신청이 없습니다.</p>}
-
-          <div className="space-y-4">
-            {groups.map((g) => {
-              const groupAmount = g.rows.reduce((s, r) => s + r.price, 0)
-              const groupChecked = g.rows.every((r) => selectedIds.has(r.id))
-              return (
-                <div key={g.memberId} className="border border-zinc-800/40 rounded-lg overflow-hidden">
-                  <CheckboxRow
-                    checked={groupChecked}
-                    onChange={() => toggleGroup(g)}
-                    className="bg-zinc-950/40"
-                  >
-                    <span className="text-sm font-medium text-zinc-200">{g.memberName}</span>
-                    <span className="text-xs text-zinc-500">
-                      {g.rows.length}권 · ₩{groupAmount.toLocaleString()}
-                    </span>
-                  </CheckboxRow>
-                  <ul>
-                    {g.rows.map((r) => {
-                      const isOrdered = r.status === 'ORDERED'
-                      return (
-                        <li
-                          key={r.id}
-                          className={`border-t border-zinc-800/30 ${
-                            isOrdered ? 'bg-emerald-950/20 opacity-70' : 'hover:bg-zinc-950/30'
-                          }`}
+                        <CheckboxRow
+                          checked={selectedIds.has(r.id)}
+                          onChange={() => toggleOne(r.id)}
                         >
-                          <CheckboxRow
-                            checked={selectedIds.has(r.id)}
-                            onChange={() => toggleOne(r.id)}
-                          >
-                            {r.thumbnailUrl && (
-                              <img src={r.thumbnailUrl} alt={r.title} className="w-8 h-10 object-cover rounded border border-zinc-800" />
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <p className={`text-sm truncate ${isOrdered ? 'text-zinc-400' : 'text-zinc-200'}`}>
-                                {r.title}
-                                {isOrdered && (
-                                  <span className="ml-2 text-xs text-emerald-400">✓ 신청완료</span>
-                                )}
-                              </p>
-                              <p className="text-xs text-zinc-500 truncate">
-                                {r.author} · {r.categoryLabel} · {r.statusLabel}
-                                {!r.aladinItemCode && r.status === 'PENDING' && (
-                                  <span className="text-amber-400 ml-1">· (알라딘 코드 없음)</span>
-                                )}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <p className="text-sm text-zinc-300 whitespace-nowrap">₩{r.price.toLocaleString()}</p>
-                              {r.sourceUrl && (
-                                <a
-                                  href={r.sourceUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  aria-label="알라딘 페이지 새 탭으로 열기"
-                                  className="group inline-flex items-center gap-1 text-zinc-400 hover:text-zinc-100 px-1.5 py-0.5 rounded hover:bg-zinc-800/60 leading-none whitespace-nowrap"
-                                >
-                                  <span className="hidden group-hover:inline text-xs">링크로 이동</span>
-                                  <span>↗</span>
-                                </a>
+                          {r.thumbnailUrl && (
+                            <img src={r.thumbnailUrl} alt={r.title} className="w-8 h-10 object-cover rounded border border-zinc-800" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm truncate ${isCompleted ? 'text-zinc-400' : 'text-zinc-200'}`}>
+                              {r.title}
+                              {isOrdered && (
+                                <span className="ml-2 text-xs text-emerald-400">✓ 신청완료</span>
                               )}
-                            </div>
-                          </CheckboxRow>
-                        </li>
-                      )
-                    })}
-                  </ul>
+                            </p>
+                            <p className="text-xs text-zinc-500 truncate">
+                              {r.author} · {r.categoryLabel} · {r.statusLabel}
+                              {!r.aladinItemCode && r.status === 'PENDING' && (
+                                <span className="text-amber-400 ml-1">· (알라딘 코드 없음)</span>
+                              )}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <p className="text-sm text-zinc-300 whitespace-nowrap">₩{r.price.toLocaleString()}</p>
+                            {r.sourceUrl && (
+                              <a
+                                href={r.sourceUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                aria-label="알라딘 페이지 새 탭으로 열기"
+                                className="group inline-flex items-center gap-1 text-zinc-400 hover:text-zinc-100 px-1.5 py-0.5 rounded hover:bg-zinc-800/60 leading-none whitespace-nowrap"
+                              >
+                                <span className="hidden group-hover:inline text-xs">링크로 이동</span>
+                                <span>↗</span>
+                              </a>
+                            )}
+                          </div>
+                        </CheckboxRow>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )
+          }
+
+          return (
+            <>
+              {/* === 신청 (PENDING) === */}
+              <section className="rounded-xl border border-zinc-800/40 bg-zinc-900/50 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-medium text-zinc-200">신청 ({pendingRows.length}건)</p>
+                  {pendingRows.length > 0 && (
+                    <CheckboxRow
+                      checked={pendingAllChecked}
+                      onChange={() => togglePendingAll()}
+                      className="px-3 py-2 text-xs text-zinc-400"
+                    >
+                      전체 선택
+                    </CheckboxRow>
+                  )}
                 </div>
-              )
-            })}
-          </div>
-        </section>
+
+                {/* 미신청 회원 */}
+                {unsubmittedData && (
+                  <div className="mb-4 rounded-lg border border-amber-900/30 bg-amber-950/10 p-3">
+                    {unsubmittedData.unsubmitted.length === 0 ? (
+                      <p className="text-sm text-emerald-300">
+                        🎉 모든 회원이 신청 완료 ({unsubmittedData.submittedCount}/{unsubmittedData.totalActiveMembers})
+                      </p>
+                    ) : (
+                      <>
+                        <p className="text-xs text-amber-400 mb-2">
+                          미신청 회원 {unsubmittedData.unsubmitted.length}명
+                          <span className="text-zinc-500 ml-1">
+                            · 제출 {unsubmittedData.submittedCount}/{unsubmittedData.totalActiveMembers}
+                          </span>
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {unsubmittedData.unsubmitted.map((m) => (
+                            <span
+                              key={m.memberId}
+                              className="inline-flex items-center gap-1.5 rounded-full bg-zinc-950/60 border border-amber-900/30 px-2.5 py-1 text-xs"
+                            >
+                              <span className="text-zinc-200">{m.name}</span>
+                              <span className="text-zinc-500">·</span>
+                              <span className="text-zinc-500">{m.email}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {isLoading && <p className="text-sm text-zinc-500">불러오는 중...</p>}
+                {!isLoading && pendingGroups.length === 0 && (
+                  <p className="text-sm text-zinc-500">대기 중인 신청이 없습니다.</p>
+                )}
+
+                <div className="space-y-4">{pendingGroups.map(renderGroupCard)}</div>
+              </section>
+
+              {/* === 신청 완료 (ORDERED 이상) === */}
+              {completedGroups.length > 0 && (
+                <section className="mt-6 rounded-xl border border-emerald-900/30 bg-emerald-950/10 p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-emerald-300">
+                      신청 완료 ({completedRows.length}건)
+                    </p>
+                    <p className="text-xs text-zinc-500">
+                      신청완료 / 도착 / 수령 단계 — 실수 시 ORDERED 행을 체크해 "신청완료 취소" 가능
+                    </p>
+                  </div>
+                  <div className="space-y-4">{completedGroups.map(renderGroupCard)}</div>
+                </section>
+              )}
+            </>
+          )
+        })()}
       </main>
     </div>
   )
