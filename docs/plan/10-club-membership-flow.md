@@ -1,7 +1,7 @@
 # 10 — 동호회 가입 / 승인 / 역할 변경 플로우
 
-> 작성일: 2026-04-24
-> 상태: v1 구현 완료 (무제는 한시적 자동 가입 유지)
+> 작성일: 2026-04-24 (자동 가입 제거 반영: 2026-05-04)
+> 상태: v1 구현 완료 — 자동 가입 로직 제거 완료. 일반 회원은 명시적 가입 신청 필수, DEVELOPER 만 자동 ADMIN.
 
 ---
 
@@ -20,10 +20,10 @@
 ## 3. 정책 / 규칙 (Rules)
 
 - **클럽 내 역할(ClubRole)**: `MEMBER`, `ADMIN`. 클럽마다 독립.
-- **전역 역할**: `DEVELOPER` (→ 자세한 정의는 `11-developer-role-and-whitelist.md`). DEVELOPER 는 모든 클럽의 관리자 엔드포인트를 통과.
+- **전역 역할**: `DEVELOPER` (→ 자세한 정의는 `11-developer-role-and-whitelist.md`). DEVELOPER 는 모든 클럽의 관리자 엔드포인트를 통과 + 모든 동호회에 ADMIN + ACTIVE 자동 가입.
+- **일반 회원 자동 가입 없음**: 로그인 + 이메일 인증 후 어떤 동호회에도 자동으로 가입되지 않는다. `requestJoin` 명시적 호출 필수.
 - **중복 신청 방지**: 같은 `(member, club)` 에 대해 PENDING 이 1건만 허용. PENDING 인 상태에서 재신청은 무시(409).
 - **탈퇴/강퇴**: v1 범위 밖. 일단 "승인된 회원 제거" 는 관리자가 DB 로 직접 처리.
-- **무제(독서 동호회) 한시 예외**: 데모 기간 중엔 로그인 직후 무제에 자동 가입됨. v2 로 넘어가기 전 제거 예정 (아래 "오픈 이슈" 참조).
 
 ## 4. UX 흐름
 
@@ -59,12 +59,11 @@
 - [x] 관리자가 거절 → PENDING 이 REJECTED 로 전환, 재신청 가능.
 - [x] PENDING 중 재신청 409.
 - [x] 역할 변경으로 ADMIN 권한이 즉시 반영됨 (로그인 토큰 만료 없이).
-- [ ] 무제 자동 가입 제거 후 "가입 신청 필수" 로 전환 (오픈 이슈).
+- [x] 자동 가입 제거 후 일반 회원은 명시적 가입 신청 필수 ([ClubBootstrap.java:46-50](../../src/main/java/com/example/demo/club/bootstrap/ClubBootstrap.java#L46), [ClubMembershipService.onAuthenticated](../../src/main/java/com/example/demo/club/service/ClubMembershipService.java#L57)).
 - [x] 비관리자의 관리자 엔드포인트 호출 403.
 
 ## 7. 오픈 이슈 / 향후 계획
 
-- **무제 자동 가입 제거**: `ClubBootstrap` 에서 `ensureDefaultMembership` 류 로직을 제거해야 한다. 기존 테스트 계정 영향 범위 확인 후 전환.
 - **탈퇴/강퇴 플로우**: 관리자 UI + 이력 보존 (탈퇴 사유·날짜).
 - **초대 링크**: 현재 "발견 → 신청" 모델뿐. 폐쇄형 동호회를 위한 초대 토큰은 로드맵 밖.
 - **알림 연계**: 승인/거절 시 회원에게 `NotificationService` 를 통한 통지 (12 문서).

@@ -1,7 +1,7 @@
 # 14 — 마감 잠금 → 합산 주문서 → 알라딘 카트 → 도착/수령
 
-> 작성일: 2026-04-24
-> 상태: v1 구현 완료 (카트 링크 수동 결제)
+> 작성일: 2026-04-24 (자동 카트 N권 담기 / 정규식 확장 반영: 2026-05-04)
+> 상태: v1 구현 완료 (카트 링크 수동 결제) — 자동 카트 담기 자동화 + 다중 코드 형식 지원 보강
 
 ---
 
@@ -35,9 +35,18 @@
 - Key: `(club_id, YYYY-MM)`. Lock 존재 시 해당 월 신청 수정 금지.
 - 관리자는 잠금/해제 자유. 실수 해제 대비로 해제는 경고 모달.
 
-### 3-3. 카트 URL 생성
-- APPROVED 책들의 `aladinUrl` (혹은 ISBN) 을 합산해 **알라딘 카트 추가 URL** 을 조합.
+### 3-3. 카트 URL 생성 / 자동 카트 담기
+- 책 신청 단계에서 회원이 알라딘 URL 입력 → 백엔드가 `POST /api/v1/clubs/{clubId}/books/parse-url` 로 파싱 ([AladinApiClient.parse](../../src/main/java/com/example/demo/club/untitled/external/AladinApiClient.java)).
+- 추출 정보: title, author, isbn, price, thumbnail, **알라딘 카트 코드 (`AddBook` 파라미터)**.
+  - 카트 코드 정규식: `[A-Z]?[0-9]+` — `K292830716` (K-prefix), `8925569574` (prefix 없는 ISBN-10), `U604737277` (U-prefix 외서) 모두 캡처.
+- 관리자 페이지에 **자동 카트 담기 스크립트 복사** 버튼.
+  - 스크립트는 카트 코드별로 `GET /shop/BasketAjax.aspx?method=basketaddwithexistcheck&isbn=<code>&qty=<n>` 를 fetch — 한 번에 N권 담기 지원.
+  - 같은 책이 여러 회원에게 신청되면 ISBN 기준으로 집계해 단일 호출로 합쳐 담음.
 - 결제/주문 번호는 시스템이 모른다. 관리자가 수동 "주문 완료" 버튼으로 ORDERED 전환.
+
+### 3-4. 카테고리 분류 (BookCategory)
+- 신청 시 회원이 카테고리 select (LITERATURE / NON_FICTION / TECH / KIDS / OTHER 등 — `BookCategory` enum).
+- 카테고리는 통계/필터용. 마감/잠금 / 카트 동작에는 영향 없음.
 
 ### 3-4. 도착/수령
 - 도착은 **책 단위로 체크박스**. 일괄 선택 + 일괄 반영 지원.
@@ -72,20 +81,23 @@
 - `GET   /api/v1/admin/clubs/{clubId}/orders` — 주문 이력.
 
 ### 회원
-- `POST /api/v1/clubs/{clubId}/books/parse-url` — 알라딘 URL 파서 (신청 전 프리뷰).
+- `POST /api/v1/clubs/{clubId}/books/parse-url` — 알라딘 URL 파서 (신청 전 프리뷰). title/author/isbn/price/thumbnail/aladinItemCode 추출.
 - `POST /api/v1/clubs/{clubId}/book-requests` — 신청 생성 (잠금/중복/예산 체크).
-- `PATCH /api/v1/clubs/{clubId}/book-requests/{id}` — 수정.
-- `DELETE /api/v1/clubs/{clubId}/book-requests/{id}` — 취소.
+- `PATCH /api/v1/clubs/{clubId}/book-requests/{id}` — 수정 (잠금 시 차단).
+- `DELETE /api/v1/clubs/{clubId}/book-requests/{id}` — 취소 (잠금 시 차단).
 - `PATCH /api/v1/clubs/{clubId}/book-requests/mark-received` — 수령 일괄.
 
 ## 6. 수용 기준 (Acceptance)
 
-- [x] 마감 잠금 후 신청 생성/수정/삭제 모두 409.
+- [x] 마감 잠금 후 신청 생성/수정/삭제 모두 차단 (각 400).
 - [x] 잠금 해제 후 다시 허용.
-- [x] 카트 URL 이 APPROVED 건 전부를 포함.
+- [x] 카트 URL 이 PENDING 건 전부를 포함 (자동 카트 담기 스크립트).
+- [x] 같은 책 N권 선택 시 한 번에 N권 담기 (`basketaddwithexistcheck&qty=N`).
+- [x] 카트 코드 정규식 `[A-Z]?[0-9]+` 으로 K-prefix / U-prefix / ISBN-10 모두 지원.
 - [x] 도착 체크박스 일괄 반영 시 상태 정확.
 - [x] 수령은 본인만, 관리자 간주 처리 경로 있음.
 - [x] 미제출 / 미수령 리스트에 이름이 정확히 노출 (동명이인 대비 이메일 tooltip).
+- [x] 책 신청 관리 페이지에서 신청(PENDING) / 신청 완료(ORDERED+) 두 섹션 분리.
 
 ## 7. 오픈 이슈 / 향후 계획
 

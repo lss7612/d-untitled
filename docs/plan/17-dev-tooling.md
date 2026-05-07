@@ -24,11 +24,12 @@
   - `DummyDataSeeder` — 로컬/개발 프로파일에서만 실행. 프로덕션 부팅 시 no-op.
   - `OrdersCleanupRunner` — 명시 플래그로만 수행 (삭제성 작업).
 - **멱등성**: 이미 있는 데이터는 덮어쓰지 않음. 없는 것만 추가.
-- **포함 범위** (DummyDataSeeder):
+- **포함 범위** (DummyDataSeeder, 2026-05-04 기준 실제 구현 [DummyDataSeeder.java](../../src/main/java/com/example/demo/club/untitled/bootstrap/DummyDataSeeder.java)):
   - 기본 클럽(무제) + DEVELOPER 1 + ADMIN 1 + MEMBER N.
   - 최근 2~3 개월치 BookRequest (각 상태 분포) + Order + BookReport 일부.
   - `AppConfigSeeder` 와 협력해 기본 키들(화이트리스트, 기본 예산) 시드.
-- **진단 엔드포인트**: (별도 컨트롤러가 있다면) 상태 점검/헬스 체크. 프로덕션 노출 시 `management.endpoints.web.exposure` 레벨로 제어.
+  - **미시드 시나리오** (오픈 이슈): 예산 나눔(BudgetShare), 일정(Schedule) 외 typeCode, 제한풀기 (Exemption) APPROVED 상태, ARRIVED 도착 대기 상태 등.
+- **진단 엔드포인트**: `GET /api/v1/auth/_dev/counts` ([DevDiagnosticsController](../../src/main/java/com/example/demo/club/untitled/controller/DevDiagnosticsController.java)) — 회원/클럽/요청 카운트 반환. **현재 접근 정책이 문서화되지 않은 상태** — 운영 노출 여부 결정 필요 (DEVELOPER only 권장).
 
 ## 4. UX 흐름
 
@@ -48,8 +49,8 @@
 - [x] 로컬 부팅 시 시연 가능 상태 자동 구성.
 - [x] 운영 프로파일에서 시드가 실행되지 않음.
 - [x] 시드 멱등 — 재부팅해도 중복 생성 안 됨.
-- [ ] 시드 데이터 구성이 docs/plan/과 일치(월별 예산/나눔/미제출 등 데모 장면 모두 커버) — 점검 필요.
-- [ ] 진단 엔드포인트의 접근 정책 문서화.
+- [⚠️] 시드 데이터 구성이 docs/plan/과 일치 — book_requests/orders/book_reports 는 커버, 예산 나눔/제한풀기/Schedule 시나리오는 미시드.
+- [ ] 진단 엔드포인트(`/auth/_dev/counts`)의 접근 정책 문서화 — 현재 미정.
 
 ## 7. 오픈 이슈 / 향후 계획
 

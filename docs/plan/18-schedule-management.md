@@ -87,6 +87,7 @@ DTO: `ScheduleRequest { typeCode, date, description }`, `ScheduleResponse { id, 
 
 ## 7. 오픈 이슈 / 향후 계획
 
+- **`typeCode` 화이트리스트 강제 부재**: 현재 [Schedule.java](../../src/main/java/com/example/demo/club/domain/Schedule.java) 가 단순 String 으로 typeCode 를 저장하고 [ScheduleService](../../src/main/java/com/example/demo/club/service/ScheduleService.java) 에 검증 없음 → 임의 문자열 저장 가능. enum 으로 강제 시 마이그레이션 (`ALTER TABLE` 또는 코드 분기 필요). 운영 데이터 쌓이기 전에 처리 권장.
 - **자동 잠금 cron**: BOOK_REQUEST_DEADLINE 도달 시 MonthLock 자동 잠금 + 알림 발송 ([14 문서](14-order-aladin-cart.md) 오픈 이슈와 연계). v2 에서 12 문서의 NotificationService 와 묶어 도입.
 - **캘린더 뷰**: 일정이 월 2~3개 이상으로 늘어나면 리스트 + 캘린더 토글.
 - **추가 typeCode 활성화**: PHOTO_SHOOT, MONTHLY_MEETING 등을 운영에서 실제 쓰게 되면 UI 에 노출.

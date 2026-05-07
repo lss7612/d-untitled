@@ -1,7 +1,7 @@
 # 12 — 알림(NotificationService) 추상화와 단계적 확장
 
-> 작성일: 2026-04-24
-> 상태: v1 (Logging 구현체) 완료, v2 Slack 구현 미착수
+> 작성일: 2026-04-24 (인터페이스 현황 동기화: 2026-05-04)
+> 상태: v1 (Logging 구현체) 부분 완료 — `NotificationService` 인터페이스에 BudgetShare 2개 메서드만 정의됨. 04 문서의 NT-01~NT-09 (독후감 리마인더, 도서 도착, 책 신청 리마인더 등) 알림 trigger 메서드는 미정의. v2 Slack 구현 미착수.
 
 ---
 
@@ -27,6 +27,28 @@
 - **타겟 해석**: v1 에서는 이메일 문자열만. v2 에서 슬랙 user ID 매핑 테이블 도입 검토.
 - **호출 지점**: 서비스 레이어에서만. 컨트롤러에서 직접 호출 금지.
 - **에러 정책**: 알림 실패는 **본 작업(예: 책 신청 저장)을 롤백하지 않는다**. 로그만 남기고 삼킴.
+
+### 현재 인터페이스 상태 (2026-05-04 기준)
+
+```java
+public interface NotificationService {
+    void onBudgetShareRequested(BudgetShare share, Member requester, Member sender);
+    void onBudgetShareAccepted(BudgetShare share, Member requester, Member sender);
+}
+```
+
+— BudgetShare 관련 2개만 정의됨. **04 문서의 NT-01~NT-09 trigger 중 다음은 인터페이스 미정의**:
+
+| 04 문서 ID | 트리거 | 우선순위 (v2 도입 권장) |
+|---|---|---|
+| NT-01 / NT-04 | 독후감 마감 D-7 / D-3 / D-1 (채널 공지) | 1순위 |
+| NT-02 | 독후감 D-1 개별 DM | 1순위 |
+| NT-03 | 책 신청 마감 D-3 / D-1 | 1순위 |
+| NT-05 | 도서 도착 알림 | 2순위 |
+| NT-06 | 수령 기한 리마인더 | 2순위 |
+| NT-07 | 벌점 부여 시 (포인트/벌점 모듈 의존) | 3순위 — doc 20 |
+| NT-08 | 이의제기 / 촬영 변경 | 3순위 |
+| NT-09 | 도서 미반납 | 3순위 |
 
 ## 4. UX 흐름 (구현 로드맵)
 
@@ -55,7 +77,7 @@
 ## 6. 수용 기준 (Acceptance)
 
 - [x] 호출부가 `NotificationService` 에만 의존 (슬랙 SDK 직접 의존 금지).
-- [x] `LoggingNotificationService` 가 9개 trigger 호출 시 로그 포맷 정상.
+- [⚠️] `LoggingNotificationService` 가 9개 trigger 호출 시 로그 포맷 정상 — **현재 BudgetShare 2개 trigger 만 정의됨**. NT-01~NT-09 메서드 추가 필요 (v2 진입 전).
 - [ ] v2: Slack Incoming Webhook 전송 성공. (미구현)
 - [ ] v2: Webhook 실패 시 원 트랜잭션 롤백 없음.
 - [ ] v3: kind + club 매핑표로 채널 선택.

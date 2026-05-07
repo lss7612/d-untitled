@@ -1,8 +1,8 @@
 # 08 — 책 카탈로그 + 중복 체크 + 제한풀기(Exemption)
 
-> 작성일: 2026-04-23
+> 작성일: 2026-04-23 (URL 기반 제한풀기 / 크로스유저 월별 차단 추가: 2026-05-04)
 > 대상 동호회: **무제 (독서)**
-> 상태: v1 구현 완료 (시드 데이터 10건, 수동 INSERT)
+> 상태: v1 구현 완료 (시드 데이터 10건, 수동 INSERT) + URL 기반 제한풀기 확장
 
 ---
 
@@ -35,8 +35,24 @@
 ### 제한풀기 신청은 별도 엔티티
 - `book_exemption_request` — 누가, 왜, 언제 신청했는지 기록.
 - Status: `PENDING / APPROVED / REJECTED`.
+- `sourceType` 컬럼: `USER_REQUEST` (회원 신청) / `ADMIN_PROACTIVE` (관리자 URL 으로 즉시 해제) — 감사 이력 구분.
 - 같은 `(club_id, book_id)` 에 대해 PENDING 은 동시에 1건만 (재신청은 REJECTED 처리된 이후에만).
 - APPROVED 처리 시: `books.exemption_granted_at = NOW()` + request 의 `processed_at / processed_by_member_id` 기록.
+
+### 같은 달 타 회원 신청과의 충돌 (DUPLICATE_MONTHLY_REQUEST)
+- 카탈로그에 아직 없어도, **같은 달 타 회원이 PENDING/ORDERED/ARRIVED 상태로 신청한 책** 이면 신청 시 409.
+- 응답 details: `code=DUPLICATE_MONTHLY_REQUEST`, `requesterMemberId/Name/Email`, `bookTitle`.
+- 회원이 알라딘 URL 을 그대로 재전송하면 카탈로그에 없는 책에도 제한풀기 신청 가능 (아래 by-url).
+
+### URL 기반 제한풀기 (book_request 충돌 대응)
+- 카탈로그에 아직 등록 안 된 책에 대해서도 사유 입력 + URL 으로 신청 가능.
+- 백엔드: 알라딘 URL 파싱 → `Book.ofCatalogPreentry()` 로 `copies=0` Book row 선반영 → PENDING 생성.
+- 이후 관리자가 approve 하면 기존 `grantExemption()` 흐름이 그대로 동작 — 카탈로그 exempt 분기로 다른 회원 신청도 통과.
+
+### 관리자 URL 즉시 해제 (proactive)
+- 관리자가 알라딘 URL 만 붙여 즉시 exemption 부여. PENDING 신청 없이 직접 APPROVED 이력 생성.
+- `BookExemptionRequest.ofAdminProactive` 로 `sourceType=ADMIN_PROACTIVE`, `status=APPROVED` row 자동 생성. 감사 이력 보존.
+- 이미 exempt 인 책에 대해 호출 시 idempotent — 새 row 생성 안 함, 기존 상태 반환.
 
 ### 에러 응답 스키마 확장
 기존 `BusinessException` 은 `{ success, message, status }` 만 반환했다. 프론트가 "제한풀기 신청" 버튼을 띄우려면 **`duplicateBookId` 도 필요** → `BusinessException` 에 `details: Map<String, Object>` 필드를 추가하고 `GlobalExceptionHandler` 가 응답 body 에 실어 보낸다.
@@ -82,17 +98,24 @@
 ## 5. API
 
 ### 회원용
-- `POST /api/v1/clubs/{clubId}/book-requests` — 기존 엔드포인트. 카탈로그 중복 시 **409** + `details.duplicateBookId`.
+- `POST /api/v1/clubs/{clubId}/book-requests` — 기존 엔드포인트. 중복 시:
+  - 카탈로그 hit → 409 `DUPLICATE_BOOK` + `duplicateBookId/Title`
+  - 카탈로그 miss + 같은 달 타 회원 신청 → 409 `DUPLICATE_MONTHLY_REQUEST` + 신청자 정보
 - `POST /api/v1/clubs/{clubId}/book-exemptions`
   - Body: `{ bookId: number, reason?: string }`
-  - 응답: `BookExemptionResponse`
-  - 같은 책에 PENDING 이 이미 있으면 409.
-  - 이미 exemption 이 승인된 책이면 400.
+  - 카탈로그에 등록된 Book 에 대한 신청.
+- `POST /api/v1/clubs/{clubId}/book-exemptions/by-url`
+  - Body: `{ url: string, reason?: string }`
+  - 카탈로그에 없는 책 (book_request 충돌 케이스). URL 파싱 → Book(copies=0) 선반영 → PENDING 생성.
+- 공통: 같은 책에 PENDING 이 이미 있으면 409. 이미 exemption 이 승인된 책이면 400.
 
 ### 관리자용 (ClubRole.ADMIN 또는 DEVELOPER)
 - `GET  /api/v1/admin/clubs/{clubId}/book-exemptions` — PENDING 목록
 - `POST /api/v1/admin/clubs/{clubId}/book-exemptions/{id}/approve`
 - `POST /api/v1/admin/clubs/{clubId}/book-exemptions/{id}/reject`
+- `GET  /api/v1/admin/clubs/{clubId}/books/exempt` — exempt 처리된 책 목록
+- `DELETE /api/v1/admin/clubs/{clubId}/books/{bookId}/exemption` — 제한 재적용 (idempotent)
+- `POST /api/v1/admin/clubs/{clubId}/books/exempt-by-url` — URL 으로 즉시 해제 (PENDING 없이 APPROVED 이력 자동 생성)
 
 ## 6. 수용 기준 (Acceptance)
 
@@ -104,6 +127,9 @@
 - [x] 관리자 거절 시 `books.exemption_granted_at` 은 그대로, request 만 REJECTED.
 - [x] 일반 회원이 관리자 엔드포인트 호출 → 403.
 - [x] 프론트 타입체크 `npx tsc --noEmit` 통과.
+- [x] 같은 달 타 회원 신청과 충돌 시 `DUPLICATE_MONTHLY_REQUEST` 응답.
+- [x] 카탈로그에 없는 책에 대해 URL 으로 제한풀기 신청 가능 (`/by-url`).
+- [x] 관리자 URL 즉시 해제 (`/books/exempt-by-url`) + `sourceType=ADMIN_PROACTIVE` 이력.
 
 ## 7. 보류 / 리스크
 
